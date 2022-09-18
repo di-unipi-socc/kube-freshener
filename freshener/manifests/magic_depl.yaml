@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: magicball
+  labels:
+    app: magicball
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: magicball
+  template:
+    metadata:
+      labels:
+        app: magicball
+    spec:
+      initContainers:
+      - name: magicball-init
+        image: docker.io/gbsal/magicball-init
+        env:
+        - name: APPDB_USER
+          value: "testuser"
+        - name: APPDB_PASS
+          value: "mypa55"
+        - name: APPDB_NAME
+          value: "magicball"
+      containers:
+      - name: magicball-server
+        image: docker.io/gbsal/magicball-server
+        env:
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: APPDB_USER
+          value: "testuser"
+        - name: APPDB_PASS
+          value: "mypa55"
+        - name: APPDB_NAME
+          value: "magicball"
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        restartPolicy: Always
