@@ -2,6 +2,14 @@ use std::{fs};
 use walkdir::WalkDir;
 use crate::{k8s_types::*, yaml_handler};
 
+pub fn get_deployments_pods(manifests: Vec<K8SManifest>) -> Vec<K8SManifest> {
+    let deployment_manifests = manifests.iter()
+        .filter(|man| man.kind == "Deployment" || man.kind == "Pod")
+        .cloned()
+        .collect::<Vec<_>>();
+    deployment_manifests
+}
+
 pub fn parse_manifests(manifests: &mut Vec<K8SManifest>) {
     for entry in WalkDir::new(".")
         .follow_links(true)
@@ -28,6 +36,8 @@ pub fn parse_manifests(manifests: &mut Vec<K8SManifest>) {
                 }
             }
     }
+
+    println!("[*] Parsing done");
 }
 
 fn unpack(manifest: &String) -> Vec<String> {
