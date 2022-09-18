@@ -41,3 +41,22 @@ pub struct K8SManifest {
     pub metadata: Option<Metadata>,
     pub spec: Spec,
 }
+
+pub fn get_patterns() -> Vec<String> {
+    let owned_vec = vec![
+        "sidecar",
+        "ambassador",
+        "adapter",
+    ].iter()
+        .map(|&s| s.to_owned()).collect::<Vec<_>>();
+
+    owned_vec
+}
+
+pub fn get_known_sidecars() -> Vec<String> {
+    let x =vec![
+        "busybox"
+    ].iter().map(|&s| s.to_owned()).collect::<Vec<_>>();
+
+    x
+}
