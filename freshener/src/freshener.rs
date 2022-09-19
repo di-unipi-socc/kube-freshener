@@ -8,6 +8,7 @@ pub fn check_independent_depl(manifests: Vec<K8SManifest>) {
 
     for manifest in deployment_manifests {
         let containers = &manifest.spec.containers;
+        let mut found_main_container = false;
         if let Some(containers) = containers {
             for container in containers {
                 let has_pattern = get_patterns().iter()
@@ -21,8 +22,19 @@ pub fn check_independent_depl(manifests: Vec<K8SManifest>) {
                     });
 
                 if !(has_pattern || has_known_sidecar) {
-                    println!("\t=> [Smell occurred] container named {} may not be a sidecar.", container.name);
-                    println!("\t.. Therefore it can potentially violate the Independent Deployability rule");
+                    if found_main_container {
+                        println!(
+                            "\t[Smell occurred] container named {} may not be a sidecar,", 
+                            container.name,
+                        );
+                        println!(
+                            "\tbecause it has {} as an image, so we cannot ensure that this container is a proper sidecar.",
+                            container.image,
+                        );
+                        println!("\tTherefore it can potentially violate the Independent Deployability rule.");
+                        continue;
+                    } 
+                    found_main_container = true;
                 }
             }
         }

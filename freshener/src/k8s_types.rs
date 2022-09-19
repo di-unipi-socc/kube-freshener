@@ -55,7 +55,12 @@ pub fn get_patterns() -> Vec<String> {
 
 pub fn get_known_sidecars() -> Vec<String> {
     let x =vec![
-        "busybox"
+        "busybox",
+        "dynatrace/oneagent",
+        "datadog/agent",
+        "prom/prometheus",
+        "elasticsearch",
+        "kibana"
     ].iter().map(|&s| s.to_owned()).collect::<Vec<_>>();
 
     x
