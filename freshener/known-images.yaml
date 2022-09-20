@@ -1,0 +1,16 @@
+sidecars:
+- name: dynatrace
+  image: dynatrace/oneagent
+  kind: monitoring
+- name: datadog
+  image: datadog/agent
+  kind: monitoring
+- name: prometheus
+  image: prom/prometheus
+  kind: monitoring
+- name: logstash
+  image: logstash
+  kind: monitoring
+- name: envoy
+  image: envoyproxy/envoy
+  kind: proxy

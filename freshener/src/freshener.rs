@@ -1,9 +1,17 @@
 use crate::{k8s_types::*, yaml_handler};
 
+pub fn check_no_api_gateway(manifests: Vec<K8SManifest>) {
+    // filtering manifests, taking only the ones with kind as "Deployment" or "Pod"
+    let deployment_manifests = yaml_handler::get_deployments_pods(manifests);
+
+    for manifest in deployment_manifests {
+        
+    }
+}
+
 // TODO: Expand the known sidecars list in k8s_types.rs
 pub fn check_independent_depl(manifests: Vec<K8SManifest>) {
 
-    // filtering manifests, taking only the ones with kind as "Deployment" or "Pod"
     let deployment_manifests = yaml_handler::get_deployments_pods(manifests);
 
     for manifest in deployment_manifests {
@@ -20,7 +28,7 @@ pub fn check_independent_depl(manifests: Vec<K8SManifest>) {
                     .any(|known_sidecar| -> bool {
                         container.image.contains(known_sidecar)
                     });
-
+                            
                 if !(has_pattern || has_known_sidecar) {
                     if found_main_container {
                         println!(
@@ -31,7 +39,7 @@ pub fn check_independent_depl(manifests: Vec<K8SManifest>) {
                             "\tbecause it has {} as an image, so we cannot ensure that this container is a proper sidecar.",
                             container.image,
                         );
-                        println!("\tTherefore it can potentially violate the Independent Deployability rule.");
+                        println!("\tTherefore it can potentially violate the Independent Deployability rule");
                         continue;
                     } 
                     found_main_container = true;
