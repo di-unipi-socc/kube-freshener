@@ -15,6 +15,9 @@ spec:
       containers:
         - name: comments
           image: cygnetops/comments-84
+          ports:
+            - containerPort: 8086
+              hostPort: 8086
 ---
 apiVersion: v1
 kind: Service

@@ -18,11 +18,13 @@ struct IgnoreList {
 }
 
 /// It filters deployment or pod manifests from all the manifests declared
-pub fn get_deployments_pods(manifests: Vec<K8SManifest>) -> Vec<K8SManifest> {
+pub fn get_deployments_pods(manifests: &Vec<K8SManifest>) -> Vec<K8SManifest> {
     let deployment_manifests = manifests
         .into_iter()
         .filter(|man| man.kind == "Deployment" || man.kind == "Pod")
+        .map(|man| man.clone())
         .collect();
+
     deployment_manifests
 }
 
@@ -54,7 +56,7 @@ pub fn parse_manifests(manifests: &mut Vec<K8SManifest>) {
         }
     }
 
-    println!("[*] Parsing done");
+    println!("[*] Parsing done\n");
 }
 
 /// It prints out the knwon-images list
@@ -94,7 +96,6 @@ fn update_ignore(converted_ignore_list: IgnoreList) {
     let yaml = serde_yaml::to_string(&converted_ignore_list).unwrap();
     let mut f = fs::OpenOptions::new()
         .write(true)
-        //&.append(true)
         .truncate(true)
         .open(KNOWN_IMAGES_PATH)
         .expect("Unable to open the file");
