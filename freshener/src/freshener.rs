@@ -9,22 +9,15 @@ pub fn check_no_apigateway(manifests: &Vec<K8SManifest>) {
         and there's no image that represent an official Docker image that implements
         message routing components then a horizontal scalability violation can occur
         */
-        let containers = manifest.spec.containers;
+        let containers = &manifest.spec.containers;
+        // TODO: do the host_network check
         let host_network: bool = if let Some(hn) = &manifest.spec.hostNetwork { *hn } else { false };
 
-        // for pods
-        if let Some(containers) = containers {
-            analyze_containres_nag(containers);
+        if let Some(conts) = containers {
+            analyze_containres_nag(&conts);
         }
 
-        // for deployments
-        if let Some(template) = manifest.spec.template {
-            if let Some(spec) = template.spec {
-                if let Some(nested_containers) = spec.containers {
-                    analyze_containres_nag(nested_containers);
-                }
-            }
-        } 
+        check_deployment_specs(manifest, |c| analyze_containres_nag(c)); 
     }
     println!("\n");
 }
@@ -37,19 +30,11 @@ pub fn check_independent_depl(manifests: &Vec<K8SManifest>) {
         let containers = &manifest.spec.containers;
 
         // checking independent deployability
-        // for pods
         if let Some(containers) = containers {
             analyze_containers_mspc(containers);
         }
 
-        // for deployments
-        if let Some(template) = manifest.spec.template {
-            if let Some(spec) = template.spec {
-                if let Some(nested_containers) = spec.containers {
-                    analyze_containers_mspc(&nested_containers);
-                }
-            }
-        } 
+        check_deployment_specs(manifest, |c| analyze_containers_mspc(c));
     }
 }
 
@@ -81,9 +66,9 @@ fn analyze_containers_mspc(containers: &Vec<Container>) {
     }
 }
 
-fn analyze_containres_nag(containers: Vec<Container>) {
+fn analyze_containres_nag(containers: &Vec<Container>) {
     for container in containers {
-        if let Some(ports) = container.ports {
+        if let Some(ports) = &container.ports {
             // check if the current container has at least one host port
             let has_host_port = ports.into_iter().any(|port| !port.hostPort.is_none());
 
@@ -98,6 +83,16 @@ fn analyze_containres_nag(containers: Vec<Container>) {
                     in the ignore list using cargo run add-ignore <name> <image> <kind>.\n",
                     container.name, container.image
                 );
+            }
+        }
+    }
+}
+
+fn check_deployment_specs(manifest: K8SManifest, func: fn(&Vec<Container>)) {
+    if let Some(template) = manifest.spec.template {
+        if let Some(spec) = template.spec {
+            if let Some(nested_containers) = spec.containers {
+                func(&nested_containers);
             }
         }
     }
