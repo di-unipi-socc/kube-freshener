@@ -1,16 +1,18 @@
-sidecars:
+images:
 - name: dynatrace
   image: dynatrace/oneagent
-  kind: monitoring
+  kind: sidecar
 - name: datadog
   image: datadog/agent
-  kind: monitoring
+  kind: sidecar
 - name: prometheus
   image: prom/prometheus
-  kind: monitoring
+  kind: sidecar
 - name: logstash
   image: logstash
-  kind: monitoring
+  kind: sidecar
 - name: envoy
   image: envoyproxy/envoy
-  kind: proxy
+  kind: sidecar
+manifests:
+- posts-srv.yaml

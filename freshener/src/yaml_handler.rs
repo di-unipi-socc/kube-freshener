@@ -3,10 +3,10 @@ use serde::{Deserialize, Serialize};
 use std::{fs, io::Write};
 use walkdir::WalkDir;
 
-const KNOWN_IMAGES_PATH: &str = "./known-images.yaml";
+const IGNORE_LIST_PATH: &str = "./ignore-list.yaml";
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct IgnoreItem {
+pub struct KnownImage {
     pub name: String,
     pub image: String,
     pub kind: String,
@@ -14,7 +14,8 @@ pub struct IgnoreItem {
 
 #[derive(Debug, Deserialize, Serialize)]
 struct IgnoreList {
-    sidecars: Vec<IgnoreItem>,
+    images: Vec<KnownImage>,
+    manifests: Vec<String>,
 }
 
 /// It filters deployment or pod manifests from all the manifests declared
@@ -36,8 +37,10 @@ pub fn parse_manifests(manifests: &mut Vec<K8SManifest>) {
         .filter_map(|e| e.ok())
     {
         let filename = entry.file_name().to_string_lossy();
+        let f = filename.to_string();
 
-        if filename.ends_with(".yaml") {
+        // Discard all manifests delcared in ignore-list.yaml
+        if filename.ends_with(".yaml") && !get_ignored_manifests().contains(&f) {
             println!("[*] Parsing {}", filename);
             let path = entry.path();
             let ref manifest_string = fs::read_to_string(path).expect(&filename.to_string());
@@ -60,33 +63,73 @@ pub fn parse_manifests(manifests: &mut Vec<K8SManifest>) {
 }
 
 /// It prints out the knwon-images list
-pub fn read_ignore_list() {
-    let converted_ignore_list: IgnoreList = internal_read(KNOWN_IMAGES_PATH.to_owned());
+pub fn read_known_imgaes() {
+    let converted_sidecar_list: IgnoreList = internal_read(IGNORE_LIST_PATH.to_owned());
 
-    println!("{:#?}", converted_ignore_list);
+    println!("{:#?}", converted_sidecar_list.images);
+}
+
+/// It prints out the manifests ignore list
+pub fn read_manifest_ignore() {
+    let converted_manifests_list: IgnoreList = internal_read(IGNORE_LIST_PATH.to_owned());
+
+    println!("{:#?}", converted_manifests_list.manifests);
+}
+
+pub fn get_known_imgaes() -> Vec<KnownImage> {
+    let converted_manifests_list: IgnoreList = internal_read(IGNORE_LIST_PATH.to_owned());
+
+    converted_manifests_list.images
+}
+
+pub fn get_ignored_manifests() -> Vec<String> {
+    let converted_manifests_list: IgnoreList = internal_read(IGNORE_LIST_PATH.to_owned());
+
+    converted_manifests_list.manifests
 }
 
 /// It adds an IngoreItem to the known-images list
-pub fn add_ignore(item: IgnoreItem) {
-    let mut converted_ignore_list: IgnoreList = internal_read(KNOWN_IMAGES_PATH.to_owned());
+pub fn add_known_image(item: KnownImage) {
+    let mut converted_ignore_list: IgnoreList = internal_read(IGNORE_LIST_PATH.to_owned());
 
     println!(
-        "[*] Adding ({}, {}, {}) as an ignore item",
+        "[*] Adding ({}, {}, {}) as a known image",
         item.name, item.image, item.kind
     );
 
-    converted_ignore_list.sidecars.push(item);
+    converted_ignore_list.images.push(item);
+
+    update_ignore(converted_ignore_list);
+}
+
+pub fn add_manifest_ignore(filename: String) {
+    let mut converted_ignore_list: IgnoreList = internal_read(IGNORE_LIST_PATH.to_owned());
+
+    println!("[*] Adding '{}' as a manifest to ignore", filename);
+
+    converted_ignore_list.manifests.push(filename);
 
     update_ignore(converted_ignore_list);
 }
 
 /// It deletes an IngoreItem from the known-images list
-pub fn delete_ignore(name: String) {
-    let mut converted_ignore_list: IgnoreList = internal_read(KNOWN_IMAGES_PATH.to_owned());
+pub fn delete_known_image(name: String) {
+    let mut converted_ignore_list: IgnoreList = internal_read(IGNORE_LIST_PATH.to_owned());
 
-    converted_ignore_list.sidecars = converted_ignore_list.sidecars
+    converted_ignore_list.images = converted_ignore_list.images
         .into_iter()
         .filter(|item| item.name != name)
+        .collect();
+
+    update_ignore(converted_ignore_list);
+}
+
+pub fn delete_manifest_ignore(name: String) {
+    let mut converted_ignore_list: IgnoreList = internal_read(IGNORE_LIST_PATH.to_owned());
+
+    converted_ignore_list.manifests = converted_ignore_list.manifests
+        .into_iter()
+        .filter(|item| *item != name)
         .collect();
 
     update_ignore(converted_ignore_list);
@@ -97,11 +140,11 @@ fn update_ignore(converted_ignore_list: IgnoreList) {
     let mut f = fs::OpenOptions::new()
         .write(true)
         .truncate(true)
-        .open(KNOWN_IMAGES_PATH)
+        .open(IGNORE_LIST_PATH)
         .expect("Unable to open the file");
     f.write_all(yaml.as_bytes()).expect("Unable to write all");
     f.flush().expect("Unable to flush");
-    fs::write(KNOWN_IMAGES_PATH, yaml).expect("Unable to write file");
+    fs::write(IGNORE_LIST_PATH, yaml).expect("Unable to write file");
 }
 
 /// It reads a file and then tries to parse to a DeserializeOwned T

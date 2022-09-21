@@ -64,26 +64,3 @@ pub fn get_patterns() -> Vec<String> {
 
     owned_vec
 }
-
-pub fn get_known_sidecar_images() -> Vec<String> {
-    let owned_vec = vec![
-        "busybox",
-        "dynatrace/oneagent",
-        "datadog/agent",
-        "prom/prometheus",
-        "elasticsearch",
-        "kibana"
-    ].into_iter()
-    .map(|s| s.to_owned()).collect();
-
-    owned_vec
-}
-
-pub fn get_known_message_routing_images() -> Vec<String> {
-    let owned_vec = vec![
-        ""
-    ].into_iter()
-    .map(|s| s.to_owned()).collect();
-
-    owned_vec
-}

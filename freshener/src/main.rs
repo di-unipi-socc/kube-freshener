@@ -1,11 +1,14 @@
 mod k8s_types;
 mod yaml_handler;
 mod freshener;
+mod cmd_handler;
 
 use std::env;
 
-use crate::{yaml_handler::IgnoreItem};
+use crate::{yaml_handler::KnownImage};
 use crate::{k8s_types::*};
+use crate::{cmd_handler::CMD};
+
 
 fn main() {
 
@@ -20,30 +23,42 @@ fn main() {
         return;
     }
 
-    match args[1].as_str() {
-        "list-ignore" => yaml_handler::read_ignore_list(),
-        "add-ignore" => {
-            if args.len() < 5 {
-                println!("[X] You're missing parameters for 'add-ignore' command [cargo run add-ignore <name> <image> <kind>");
-                return;
+    let command = CMD::from_str(args[1].as_str());
+
+    match command {
+        CMD::ListKnownImages => yaml_handler::read_known_imgaes(),
+        CMD::ListManifestsIgnore => yaml_handler::read_manifest_ignore(),
+        CMD::AddKnownImage => {
+            if CMD::check_args(&command, &args) {
+                let known_image = KnownImage {
+                    name: args[2].clone(),
+                    image: args[3].clone(),
+                    kind: args[4].clone(),
+                };
+    
+                yaml_handler::add_known_image(known_image);
             }
-
-            let ignore_item = IgnoreItem {
-                name: args[2].clone(),
-                image: args[3].clone(),
-                kind: args[4].clone(),
-            };
-
-            yaml_handler::add_ignore(ignore_item);
         },
-        "delete-ignore" => {
-            if args.len() < 3 {
-                println!("[X] You're missing <name> parameter: [cargo run delete-ignore <name>]");
-                return;
+        CMD::AddManifestIgnore => {
+            if CMD::check_args(&command, &args) {
+                let filename = args[2].clone().to_owned();
+                yaml_handler::add_manifest_ignore(filename);
             }
-
-            yaml_handler::delete_ignore(args[2].to_owned());
         },
-        _ => { return; },
+        CMD::DeleteKnownImage => {
+            if CMD::check_args(&command, &args) {
+                let name = args[2].clone().to_owned();
+                yaml_handler::delete_known_image(name);
+            }
+        },
+        CMD::DeleteManifestIgnore => {
+            if CMD::check_args(&command, &args) {
+                let name = args[2].clone().to_owned();
+                yaml_handler::delete_manifest_ignore(name);
+            }
+        }
+        _ =>  println!("Unrecognized command")
     }
+
 }
+

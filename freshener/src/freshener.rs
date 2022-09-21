@@ -3,7 +3,7 @@ use crate::{k8s_types::*, yaml_handler};
 pub fn check_no_apigateway(manifests: &Vec<K8SManifest>) {
     let deployment_manifest = yaml_handler::get_deployments_pods(manifests);
 
-    for manifest in deployment_manifest {
+    for manifest in deployment_manifest.into_iter() {
         /* 
         if hostNetwork is set as true or inside a container there's ports.-hostPort,
         and there's no image that represent an official Docker image that implements
@@ -46,9 +46,9 @@ fn analyze_containers_mspc(containers: &Vec<Container>) {
                 container.name.contains(pattern) || container.image.contains(pattern)
             });
     
-        let has_known_sidecar = get_known_sidecar_images().iter()
-            .any(|known_sidecar| -> bool {
-                container.image.contains(known_sidecar)
+        let has_known_sidecar =  yaml_handler::get_known_imgaes().iter()
+            .any(|i| -> bool {
+                i.kind == "sidecar" && container.image.contains(&i.image)
             });
                 
         if !(has_pattern || has_known_sidecar) {
@@ -99,5 +99,5 @@ fn check_deployment_specs(manifest: K8SManifest, func: fn(&Vec<Container>)) {
 }
 
 fn implements_message_routing(image_name: String) -> bool {
-    get_known_message_routing_images().into_iter().any(|sidecar| sidecar == image_name)
+    yaml_handler::get_known_imgaes().into_iter().any(|i| i.kind == "mr" && i.image == image_name)
 }
