@@ -14,10 +14,17 @@ pub fn check_no_apigateway(manifests: &Vec<K8SManifest>) {
         let host_network: bool = if let Some(hn) = &manifest.spec.hostNetwork { *hn } else { false };
 
         if let Some(conts) = containers {
-            analyze_containres_nag(&conts);
+            analyze_containers_nag(&conts, host_network);
         }
-
-        check_deployment_specs(manifest, |c| analyze_containres_nag(c)); 
+        
+        if let Some(template) = manifest.spec.template {
+            if let Some(spec) = template.spec {
+                if let Some(nested_containers) = spec.containers {
+                    analyze_containers_nag(&nested_containers, host_network);
+                }
+            }
+        }
+        
     }
     println!("\n");
 }
@@ -34,7 +41,13 @@ pub fn check_independent_depl(manifests: &Vec<K8SManifest>) {
             analyze_containers_mspc(containers);
         }
 
-        check_deployment_specs(manifest, |c| analyze_containers_mspc(c));
+        if let Some(template) = manifest.spec.template {
+            if let Some(spec) = template.spec {
+                if let Some(nested_containers) = spec.containers {
+                    analyze_containers_mspc(&nested_containers);
+                }
+            }
+        }
     }
 }
 
@@ -66,8 +79,19 @@ fn analyze_containers_mspc(containers: &Vec<Container>) {
     }
 }
 
-fn analyze_containres_nag(containers: &Vec<Container>) {
+fn analyze_containers_nag(containers: &Vec<Container>, hostNetwork: bool) {
     for container in containers {
+        if hostNetwork && !implements_message_routing(container.image.clone()) {
+            println!(
+                "[Smell occurred - No API Gateway]\nHostNetwork is set to true and container's (named '{}'), \
+                image '{}' may not be a proper message routing implementation and \
+                this could be a potential no api gateway smell.\nIf you were to be sure that \
+                your image implements message routing, then we suggest you to add the image \
+                in the ignore list using cargo run add-ignore <name> <image> <kind>.\n",
+                container.name, container.image
+            );
+        }
+
         if let Some(ports) = &container.ports {
             // check if the current container has at least one host port
             let has_host_port = ports.into_iter().any(|port| !port.hostPort.is_none());
@@ -83,16 +107,6 @@ fn analyze_containres_nag(containers: &Vec<Container>) {
                     in the ignore list using cargo run add-ignore <name> <image> <kind>.\n",
                     container.name, container.image
                 );
-            }
-        }
-    }
-}
-
-fn check_deployment_specs(manifest: K8SManifest, func: fn(&Vec<Container>)) {
-    if let Some(template) = manifest.spec.template {
-        if let Some(spec) = template.spec {
-            if let Some(nested_containers) = spec.containers {
-                func(&nested_containers);
             }
         }
     }

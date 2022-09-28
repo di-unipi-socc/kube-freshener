@@ -1,6 +1,6 @@
 use crate::{k8s_types::*, yaml_handler};
 use serde::{Deserialize, Serialize};
-use std::{fs, io::Write};
+use std::{fs, io::Write, io, path::Path};
 use walkdir::WalkDir;
 
 const IGNORE_LIST_PATH: &str = "./ignore-list.yaml";
@@ -60,6 +60,15 @@ pub fn parse_manifests(manifests: &mut Vec<K8SManifest>) {
     }
 
     println!("[*] Parsing done\n");
+}
+
+pub fn parse_toscas() {
+    let path = Path::new("./mTOSCA/simple-micro-tosca.yml");
+    let ref tosca_string = fs::read_to_string(path).unwrap();
+    let mut deserializer = serde_yaml::Deserializer::from_str(tosca_string);
+    let mut serializer = serde_json::Serializer::new(io::stdout());
+
+    serde_transcode::transcode(deserializer, &mut serializer).unwrap();
 }
 
 /// It prints out the knwon-images list

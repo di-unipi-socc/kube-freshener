@@ -20,6 +20,7 @@ fn main() {
         yaml_handler::parse_manifests(&mut manifests);
         freshener::check_independent_depl(&manifests);
         freshener::check_no_apigateway(&manifests);
+        // yaml_handler::parse_toscas();
         return;
     }
 
