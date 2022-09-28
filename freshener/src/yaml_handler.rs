@@ -65,10 +65,11 @@ pub fn parse_manifests(manifests: &mut Vec<K8SManifest>) {
 pub fn parse_toscas() {
     let path = Path::new("./mTOSCA/simple-micro-tosca.yml");
     let ref tosca_string = fs::read_to_string(path).unwrap();
-    let mut deserializer = serde_yaml::Deserializer::from_str(tosca_string);
-    let mut serializer = serde_json::Serializer::new(io::stdout());
+    let tosca_json = serde_yaml::from_str::<serde_json::Value>(&tosca_string).unwrap();
 
-    serde_transcode::transcode(deserializer, &mut serializer).unwrap();
+    for (key, value) in tosca_json.as_object().unwrap() {
+        println!("{} => {}", key, value);
+    }
 }
 
 /// It prints out the knwon-images list
