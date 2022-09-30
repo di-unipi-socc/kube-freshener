@@ -1,6 +1,7 @@
 use crate::{k8s_types::*, yaml_handler};
+use crate::{tosca_types::*};
 use serde::{Deserialize, Serialize};
-use std::{fs, io::Write, io, path::Path};
+use std::{fs, io::Write, path::Path};
 use walkdir::WalkDir;
 
 const IGNORE_LIST_PATH: &str = "./ignore-list.yaml";
@@ -57,19 +58,38 @@ pub fn parse_manifests(manifests: &mut Vec<K8SManifest>) {
                 manifests.push(converted_manifest)
             }
         }
-    }
+    } 
 
     println!("[*] Parsing done\n");
 }
 
-pub fn parse_toscas() {
+pub fn parse_tosca(nodes: &mut Vec<NodeTemplate>) {
     let path = Path::new("./mTOSCA/simple-micro-tosca.yml");
     let ref tosca_string = fs::read_to_string(path).unwrap();
     let tosca_json = serde_yaml::from_str::<serde_json::Value>(&tosca_string).unwrap();
 
-    for (key, value) in tosca_json.as_object().unwrap() {
-        println!("{} => {}", key, value);
+    println!("{:#?}", tosca_json);
+    println!("---");
+
+    if let Some(topology_template) = tosca_json
+        .as_object()
+        .unwrap()
+        .get("topology_template") {
+
+        if let Some(node_templates) = topology_template
+            .as_object()
+            .unwrap()
+            .get("node_templates") {
+
+                for (key, value) in node_templates.as_object().unwrap() {
+                    let mut node_template: NodeTemplate = serde_json::from_value(value.clone()).unwrap();
+                    node_template.name = Some(key.to_string());
+                    nodes.push(node_template);
+                }
+
+            }
     }
+
 }
 
 /// It prints out the knwon-images list

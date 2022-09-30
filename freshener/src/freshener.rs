@@ -79,9 +79,9 @@ fn analyze_containers_mspc(containers: &Vec<Container>) {
     }
 }
 
-fn analyze_containers_nag(containers: &Vec<Container>, hostNetwork: bool) {
+fn analyze_containers_nag(containers: &Vec<Container>, host_network: bool) {
     for container in containers {
-        if hostNetwork && !implements_message_routing(container.image.clone()) {
+        if host_network && !implements_message_routing(container.image.clone()) {
             println!(
                 "[Smell occurred - No API Gateway]\nHostNetwork is set to true and container's (named '{}'), \
                 image '{}' may not be a proper message routing implementation and \

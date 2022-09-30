@@ -2,8 +2,11 @@ mod k8s_types;
 mod yaml_handler;
 mod freshener;
 mod cmd_handler;
+mod tosca_types;
 
 use std::env;
+
+use tosca_types::NodeTemplate;
 
 use crate::{yaml_handler::KnownImage};
 use crate::{k8s_types::*};
@@ -16,11 +19,12 @@ fn main() {
 
     if args.len() <= 1 {
         let mut manifests: Vec<K8SManifest> = Vec::new();
+        let mut tosca_nodes: Vec<NodeTemplate> = Vec::new();
             
         yaml_handler::parse_manifests(&mut manifests);
         freshener::check_independent_depl(&manifests);
         freshener::check_no_apigateway(&manifests);
-        yaml_handler::parse_toscas();
+        yaml_handler::parse_tosca(&mut tosca_nodes);
         return;
     }
 
