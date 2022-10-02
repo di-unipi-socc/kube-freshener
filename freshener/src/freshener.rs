@@ -1,4 +1,87 @@
-use crate::{k8s_types::*, yaml_handler};
+use std::{collections::HashMap};
+
+use crate::{k8s_types::*, tosca_types::*, yaml_handler};
+
+const DATASTORE_TYPE: &str = "micro.nodes.Datastore";
+
+struct K8sToscaNode {
+    kind: String,
+    has_service: bool
+}
+
+pub fn check_endpoint_based_interaction(
+    manifests: &Vec<K8SManifest>, 
+    nodes: &Vec<NodeTemplate> 
+) {
+    let mut node_hashmap: HashMap<String, (String, bool)> = HashMap::new();
+
+    // iterate over nodes
+    // save nodes types
+    for node in nodes {
+        if let Some(name) = &node.name {
+            if let Some(kind) = &node.kind {
+                node_hashmap.insert(name.to_string(), (kind.to_string(), false));
+            }
+        }
+    }
+
+    // iterate through k8s services and link them
+    // to appropriate nodes in node_hashmap
+    let services = yaml_handler::get_services(manifests);
+
+    for service in services {
+        if let Some(selector) = service.spec.selector {
+            if let Some(name) = selector.app {
+                // if exists a service with the selector.app = tosca service name
+                if let Some(node) = node_hashmap.get(&name) {
+                    // set the bool as true so that we can identify tosca services that have
+                    // an attached k8s service
+                    node_hashmap.insert(name, (node.0.clone(), true));
+                }
+            }
+        }
+    }
+
+    // re-iterate over nodes
+    for node in nodes {
+
+        // iterate over interactions
+        if let Some(requirements) = &node.requirements {
+            for requirement in requirements {
+                let mut node_name = String::new();
+
+                if let Some(interaction) = &requirement.interaction {
+                    match interaction {
+                        Interaction::String(val) => node_name = val.to_string(),
+                        Interaction::DetailedInteraction(val) => {
+                            if let Some(detailed_node) = &val.node {
+                                node_name = detailed_node.to_string();
+                            }
+                        }
+                    }
+                }
+                
+                // if an interaction is in the hashmap, then insert 
+                // and verify that it is not a micro.nodes.Datastore node
+                if let Some(node_name) = &node.name {
+                    if let Some(node) = node_hashmap.get(&node_name.to_string()) {
+                        if node.0 != DATASTORE_TYPE {
+                            // now we know that this interaction is not
+                            // a Datastore object
+
+                            // next step: We need to ensure that the only way to access
+                            // B is through k8s services, so we have to check that 
+                            // the node.has_service (node.1) is true and we also have to 
+                            // check that the service
+                            
+                        }
+                    }
+                }
+                
+            }
+        }
+    }
+}
 
 pub fn check_no_apigateway(manifests: &Vec<K8SManifest>) {
     let deployment_manifest = yaml_handler::get_deployments_pods(manifests);

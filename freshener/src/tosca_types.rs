@@ -2,18 +2,18 @@ use serde::{Deserialize};
 
 #[derive(Debug, Deserialize)]
 pub struct Requirement {
-    interaction: Option<Interatction>
+    pub interaction: Option<Interaction>
 }
 
 #[derive(Debug, Deserialize)]
 pub struct DetailedInteraction {
-    node: Option<String>,
-    relationship: Option<String>
+    pub node: Option<String>,
+    pub relationship: Option<String>
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
-pub enum Interatction {
+pub enum Interaction {
     String(String),
     DetailedInteraction(DetailedInteraction)
 }
@@ -21,5 +21,7 @@ pub enum Interatction {
 #[derive(Debug, Deserialize)]
 pub struct NodeTemplate {
     pub name: Option<String>,
+    #[serde(rename = "type")]
+    pub kind: Option<String>,
     pub requirements: Option<Vec<Requirement>>
 }

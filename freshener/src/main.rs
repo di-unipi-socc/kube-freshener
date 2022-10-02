@@ -20,11 +20,12 @@ fn main() {
     if args.len() <= 1 {
         let mut manifests: Vec<K8SManifest> = Vec::new();
         let mut tosca_nodes: Vec<NodeTemplate> = Vec::new();
-            
-        yaml_handler::parse_manifests(&mut manifests);
+          
+        startup(&mut tosca_nodes, &mut manifests);
+
         freshener::check_independent_depl(&manifests);
         freshener::check_no_apigateway(&manifests);
-        yaml_handler::parse_tosca(&mut tosca_nodes);
+        
         return;
     }
 
@@ -67,3 +68,7 @@ fn main() {
 
 }
 
+fn startup(tosca_nodes: &mut Vec<NodeTemplate>, manifests: &mut Vec<K8SManifest>) {
+    yaml_handler::parse_tosca(tosca_nodes);
+    yaml_handler::parse_manifests(manifests);
+}

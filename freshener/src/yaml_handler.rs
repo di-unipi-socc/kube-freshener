@@ -19,6 +19,17 @@ struct IgnoreList {
     manifests: Vec<String>,
 }
 
+/// It filters services from all the manifests declared
+pub fn get_services(manifests: &Vec<K8SManifest>) -> Vec<K8SManifest> {
+    let services = manifests
+        .into_iter()
+        .filter(|man| man.kind == "Service")
+        .map(|man| man.clone())
+        .collect();
+
+    services
+}
+
 /// It filters deployment or pod manifests from all the manifests declared
 pub fn get_deployments_pods(manifests: &Vec<K8SManifest>) -> Vec<K8SManifest> {
     let deployment_manifests = manifests
@@ -67,9 +78,6 @@ pub fn parse_tosca(nodes: &mut Vec<NodeTemplate>) {
     let path = Path::new("./mTOSCA/simple-micro-tosca.yml");
     let ref tosca_string = fs::read_to_string(path).unwrap();
     let tosca_json = serde_yaml::from_str::<serde_json::Value>(&tosca_string).unwrap();
-
-    println!("{:#?}", tosca_json);
-    println!("---");
 
     if let Some(topology_template) = tosca_json
         .as_object()

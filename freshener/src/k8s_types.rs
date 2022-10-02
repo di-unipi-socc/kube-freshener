@@ -33,6 +33,11 @@ pub struct Template {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct Selector {
+    pub app: Option<String>
+}
+
+#[derive(Debug, Clone, Deserialize)]
 #[allow(non_snake_case)]
 pub struct Spec {
     pub initContainers: Option<Vec<Container>>,
@@ -40,6 +45,7 @@ pub struct Spec {
     pub volumes: Option<Vec<Volume>>,
     pub template: Option<Template>,
     pub hostNetwork: Option<bool>,
+    pub selector: Option<Selector>
 }
 
 #[derive(Debug, Clone, Deserialize)]
