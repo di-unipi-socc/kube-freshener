@@ -19,6 +19,39 @@ struct IgnoreList {
     manifests: Vec<String>,
 }
 
+pub fn deployment_has_direct_access(deployment: K8SManifest) -> bool {
+
+    let host_network: bool = if let Some(hn) = deployment.spec.hostNetwork { true } else { false };
+
+    if !host_network {
+        if let Some(containers) = deployment.spec.containers {
+            for container in containers {
+                if let Some(ports) = container.ports {
+                    let has_host_port = ports.into_iter().any(|port| !port.hostPort.is_none());
+                    if has_host_port {
+                        return true
+                    }
+                }
+            }
+        }
+    }
+
+    false
+}
+
+pub fn get_deployment_named(name: String, manifests: &Vec<K8SManifest>) -> Option<K8SManifest> {
+    let deployments = get_deployments_pods(manifests);
+
+    deployments
+        .into_iter()
+        .find(|d| {
+            if let Some(m) = &d.metadata {
+                return m.name == name
+            }
+            false
+        })
+}
+
 /// It filters services from all the manifests declared
 pub fn get_services(manifests: &Vec<K8SManifest>) -> Vec<K8SManifest> {
     let services = manifests

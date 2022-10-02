@@ -6,21 +6,31 @@ const DATASTORE_TYPE: &str = "micro.nodes.Datastore";
 
 struct K8sToscaNode {
     kind: String,
-    has_service: bool
+    has_service: bool,
+    has_direct_access: bool
 }
 
 pub fn check_endpoint_based_interaction(
     manifests: &Vec<K8SManifest>, 
     nodes: &Vec<NodeTemplate> 
 ) {
-    let mut node_hashmap: HashMap<String, (String, bool)> = HashMap::new();
+    let mut node_hashmap: HashMap<String, K8sToscaNode> = HashMap::new();
 
     // iterate over nodes
     // save nodes types
     for node in nodes {
         if let Some(name) = &node.name {
             if let Some(kind) = &node.kind {
-                node_hashmap.insert(name.to_string(), (kind.to_string(), false));
+                // I want to obtain deployment details to get a possible host port
+                let deployment = yaml_handler::get_deployment_named(name.to_string(), manifests);
+                if let Some(depl) = deployment {
+                    let tosca_node = K8sToscaNode {
+                        kind: kind.to_string(),
+                        has_service: false,
+                        has_direct_access: yaml_handler::deployment_has_direct_access(depl)
+                    };
+                    node_hashmap.insert(name.to_string(), tosca_node);
+                }
             }
         }
     }
@@ -36,7 +46,12 @@ pub fn check_endpoint_based_interaction(
                 if let Some(node) = node_hashmap.get(&name) {
                     // set the bool as true so that we can identify tosca services that have
                     // an attached k8s service
-                    node_hashmap.insert(name, (node.0.clone(), true));
+                    let updated_tosca_node = K8sToscaNode {
+                        kind: node.kind.to_string(),
+                        has_service: true,
+                        has_direct_access: node.has_direct_access
+                    };
+                    node_hashmap.insert(name, updated_tosca_node);
                 }
             }
         }
@@ -46,6 +61,7 @@ pub fn check_endpoint_based_interaction(
     for node in nodes {
 
         // iterate over interactions
+        // an interaction service is a destination service
         if let Some(requirements) = &node.requirements {
             for requirement in requirements {
                 let mut node_name = String::new();
@@ -63,20 +79,29 @@ pub fn check_endpoint_based_interaction(
                 
                 // if an interaction is in the hashmap, then insert 
                 // and verify that it is not a micro.nodes.Datastore node
-                if let Some(node_name) = &node.name {
-                    if let Some(node) = node_hashmap.get(&node_name.to_string()) {
-                        if node.0 != DATASTORE_TYPE {
-                            // now we know that this interaction is not
-                            // a Datastore object
+                if let Some(dest_node) = node_hashmap.get(&node_name.to_string()) {
+                    if dest_node.kind != DATASTORE_TYPE {
+                        // now we know that this interaction is not
+                        // a Datastore object
 
-                            // next step: We need to ensure that the only way to access
-                            // B is through k8s services, so we have to check that 
-                            // the node.has_service (node.1) is true and we also have to 
-                            // check that the service
-                            
+                        // next step: We need to ensure that the only way to access
+                        // B is through k8s services, so we have to check that 
+                        // the node.has_service is true and we also have to 
+                        // check that the service named node_name has not in the manifest
+                        // any hostPort or hostNetwork
+                        if dest_node.has_direct_access || !dest_node.has_service {
+                            // possible smell
+                            println!(
+                                "[Smell occurred - Endpoint Based Interaction]\nService named {} is reached by \
+                                a service named {}, but it is direct reachable using a host port that you declared. \
+                                To solve this smell please remove any host network and host port and usea k8s \
+                                service instead.\n",
+                                node_name, node.name.as_ref().unwrap()
+                            );
                         }
                     }
                 }
+                
                 
             }
         }
