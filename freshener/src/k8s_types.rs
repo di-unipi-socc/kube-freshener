@@ -7,6 +7,12 @@ pub struct Port {
     pub hostPort: Option<i32>,
 }
 
+pub struct K8sToscaNode {
+    pub kind: String,
+    pub has_service: bool,
+    pub has_direct_access: bool
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct Container {
     pub name: String,
@@ -38,6 +44,18 @@ pub struct Selector {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct OutlierDetection {
+    pub consecutive5xxErrors: Option<i32>,
+    pub interval: Option<String>
+
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct TrafficPolicy {
+    pub outlierDetection: Option<OutlierDetection>
+}
+
+#[derive(Debug, Clone, Deserialize)]
 #[allow(non_snake_case)]
 pub struct Spec {
     pub initContainers: Option<Vec<Container>>,
@@ -45,7 +63,10 @@ pub struct Spec {
     pub volumes: Option<Vec<Volume>>,
     pub template: Option<Template>,
     pub hostNetwork: Option<bool>,
-    pub selector: Option<Selector>
+    pub selector: Option<Selector>,
+    pub hosts: Option<Vec<String>>,
+    pub host: Option<String>,
+    pub trafficPolicy: Option<TrafficPolicy>
 }
 
 #[derive(Debug, Clone, Deserialize)]

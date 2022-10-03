@@ -25,7 +25,9 @@ fn main() {
 
         freshener::check_independent_depl(&manifests);
         freshener::check_no_apigateway(&manifests);
-        
+        freshener::check_endpoint_based_interaction(&manifests, &tosca_nodes);
+        freshener::check_wobbly_interaction(&manifests, &tosca_nodes);
+
         return;
     }
 

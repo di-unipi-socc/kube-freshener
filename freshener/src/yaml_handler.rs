@@ -21,7 +21,7 @@ struct IgnoreList {
 
 pub fn deployment_has_direct_access(deployment: K8SManifest) -> bool {
 
-    let host_network: bool = if let Some(hn) = deployment.spec.hostNetwork { true } else { false };
+    let host_network: bool = if let Some(_hn) = deployment.spec.hostNetwork { true } else { false };
 
     if !host_network {
         if let Some(containers) = deployment.spec.containers {
@@ -50,6 +50,28 @@ pub fn get_deployment_named(name: String, manifests: &Vec<K8SManifest>) -> Optio
             }
             false
         })
+}
+
+/// It filters destination rules from all the manifests declared
+pub fn get_destination_rules(manifest: &Vec<K8SManifest>) -> Vec<K8SManifest> {
+    let v_services = manifest
+        .into_iter()
+        .filter(|man| man.kind == "DestinationRule")
+        .map(|man| man.clone())
+        .collect();
+
+    v_services
+}
+
+/// It filters virtual services from all the manifests declared
+pub fn get_virtual_services(manifest: &Vec<K8SManifest>) -> Vec<K8SManifest> {
+    let v_services = manifest
+        .into_iter()
+        .filter(|man| man.kind == "VirtualService")
+        .map(|man| man.clone())
+        .collect();
+
+    v_services
 }
 
 /// It filters services from all the manifests declared

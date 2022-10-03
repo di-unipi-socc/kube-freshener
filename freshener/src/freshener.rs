@@ -4,10 +4,65 @@ use crate::{k8s_types::*, tosca_types::*, yaml_handler};
 
 const DATASTORE_TYPE: &str = "micro.nodes.Datastore";
 
-struct K8sToscaNode {
-    kind: String,
-    has_service: bool,
-    has_direct_access: bool
+pub fn check_wobbly_interaction(
+    manifests: &Vec<K8SManifest>,
+    nodes: &Vec<NodeTemplate>
+) {
+    let ref virtual_services = yaml_handler::get_virtual_services(manifests);
+    let ref dest_rules = yaml_handler::get_destination_rules(manifests);
+
+    for node in nodes {
+        if let Some(requirements) = &node.requirements {
+            for requirement in requirements {
+                let mut dest_node_name = String::new();
+
+                if let Some(interaction) = &requirement.interaction {
+                    match interaction {
+                        Interaction::String(val) => dest_node_name = val.to_string(),
+                        Interaction::DetailedInteraction(val) => {
+                            if let Some(detailed_node) = &val.node {
+                                dest_node_name = detailed_node.to_string();
+                            }
+                        }
+                    }
+                }
+
+                // given the destination node I have to check if there is a virtual service
+                // having spec.hosts = dest_node_name or a destination rule having
+                // spec.host = dest_node_n
+                let has_virtual_service = virtual_services
+                    .into_iter()
+                    .any(|m| {
+                        if let Some(hosts) = &m.spec.hosts {
+                            return hosts
+                            .into_iter()
+                            .any(|h| *h == dest_node_name)
+                        }
+
+                        false
+                    });
+
+                let has_outlier_detection = dest_rules
+                .into_iter()
+                .any(|m| {
+                    if let (Some(host), Some(traffic_policy)) = (&m.spec.host, &m.spec.trafficPolicy) {
+                        return *host == dest_node_name && !traffic_policy.outlierDetection.is_none()
+                    }
+
+                    false
+                });
+
+                if !has_virtual_service && !has_outlier_detection {
+                    println!(
+                        "[Smell occurred - Wobbly Interaction]\nService named {} is reached by \
+                        a service named {} without any circuit breaker or timeout: resolve the occurrence of wobbly \
+                        service interactions smells by adding circuit_breaker and/or and timeout in between .\n",
+                        dest_node_name, node.name.as_ref().unwrap()
+                    );
+                }
+            }
+        }
+    }
 }
 
 pub fn check_endpoint_based_interaction(
@@ -19,18 +74,16 @@ pub fn check_endpoint_based_interaction(
     // iterate over nodes
     // save nodes types
     for node in nodes {
-        if let Some(name) = &node.name {
-            if let Some(kind) = &node.kind {
-                // I want to obtain deployment details to get a possible host port
-                let deployment = yaml_handler::get_deployment_named(name.to_string(), manifests);
-                if let Some(depl) = deployment {
-                    let tosca_node = K8sToscaNode {
-                        kind: kind.to_string(),
-                        has_service: false,
-                        has_direct_access: yaml_handler::deployment_has_direct_access(depl)
-                    };
-                    node_hashmap.insert(name.to_string(), tosca_node);
-                }
+        if let (Some(name), Some(kind)) = (&node.name, &node.kind) {
+            // I want to obtain deployment details to get a possible host port
+            let deployment = yaml_handler::get_deployment_named(name.to_string(), manifests);
+            if let Some(depl) = deployment {
+                let tosca_node = K8sToscaNode {
+                    kind: kind.to_string(),
+                    has_service: false,
+                    has_direct_access: yaml_handler::deployment_has_direct_access(depl)
+                };
+                node_hashmap.insert(name.to_string(), tosca_node);
             }
         }
     }
@@ -89,13 +142,25 @@ pub fn check_endpoint_based_interaction(
                         // the node.has_service is true and we also have to 
                         // check that the service named node_name has not in the manifest
                         // any hostPort or hostNetwork
-                        if dest_node.has_direct_access || !dest_node.has_service {
+                        if dest_node.has_direct_access {
                             // possible smell
                             println!(
                                 "[Smell occurred - Endpoint Based Interaction]\nService named {} is reached by \
                                 a service named {}, but it is direct reachable using a host port that you declared. \
                                 To solve this smell please remove any host network and host port and usea k8s \
                                 service instead.\n",
+                                node_name, node.name.as_ref().unwrap()
+                            );
+                        }
+
+                        if !dest_node.has_service {
+                            // possible smell
+                            println!(
+                                "[Smell occurred - Endpoint Based Interaction]\nService named {} is reached by \
+                                a service named {}, but there's no k8s service associated with it. \
+                                Therefore destination service could be reached with a hardcoded address. \
+                                To solve this smell please remove any host network and host port and usea k8s \
+                                service instead .\n",
                                 node_name, node.name.as_ref().unwrap()
                             );
                         }
