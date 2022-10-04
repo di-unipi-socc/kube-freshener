@@ -4,51 +4,54 @@ imports:
 - micro: https://di-unipi-socc.github.io/microTOSCA/1.1/microTOSCA.yaml
 topology_template:
   node_templates:
-    shipping:
-      type: micro.nodes.Service
-      requirements:
-      - interaction: order_db
-      - interaction: rabbitmq
-      - interaction: catalogue
     catalogue:
       type: micro.nodes.Service
       requirements:
-      - interaction: order
-    order_db:
-      type: micro.nodes.Datastore
-    order:
+      - interaction: categories
+      - interaction: products
+    products:
       type: micro.nodes.Service
       requirements:
-      - interaction:
-          node: shipping
-          relationship: tcd
-      - interaction: order_db
-      - interaction: rabbitmq
+      - interaction: products_db
+      - interaction: cart
+    products_db:
+      type: micro.nodes.Datastore
+    categories:
+      type: micro.nodes.Service
+      requirements:
+      - interaction: categories_db
+    categories_db:
+      type: micro.nodes.Datastore
     rabbitmq:
       type: micro.nodes.MessageBroker
-    Api gateway:
+    cart:
+      type: micro.nodes.Service
+      requirements:
+      - interaction: rabbitmq
+    payments:
+      type: micro.nodes.Service
+      requirements:
+      - interaction: rabbitmq
+      - interaction: shipping
+    shipping:
+      type: micro.nodes.Service
+      requirements:
+      - interaction: user-manager
+    user-manager:
+      type: micro.nodes.Service
+      requirements:
+      - interaction: cart
+      - interaction: catalogue
+    gateway:
       type: micro.nodes.MessageRouter
       requirements:
-      - interaction: shipping
+      - interaction: user-manager
   groups:
     edgenodes:
       type: micro.groups.Edge
       members:
-      - order
-      - Api gateway
-      - catalogue
-    team-primo:
-      type: micro.groups.Team
-      members:
-      - shipping
-      - order
-      - order_db
-    team-secondo:
-      type: micro.groups.Team
-      members:
-      - Api gateway
-      - rabbitmq
-      - catalogue
+      - gateway
+      - user-manager
   relationship_templates:
     t:
       type: micro.relationships.InteractsWith
@@ -83,3 +86,5 @@ topology_template:
         timeout: true
         circuit_breaker: true
         dynamic_discovery: true
+
+    

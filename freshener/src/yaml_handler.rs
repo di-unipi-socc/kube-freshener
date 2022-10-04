@@ -5,6 +5,7 @@ use std::{fs, io::Write, path::Path};
 use walkdir::WalkDir;
 
 const IGNORE_LIST_PATH: &str = "./ignore-list.yaml";
+const TOSCA_PATH: &str = "./mTOSCA/mtosca.yaml";
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct KnownImage {
@@ -130,7 +131,7 @@ pub fn parse_manifests(manifests: &mut Vec<K8SManifest>) {
 }
 
 pub fn parse_tosca(nodes: &mut Vec<NodeTemplate>) {
-    let path = Path::new("./mTOSCA/simple-micro-tosca.yml");
+    let path = Path::new(TOSCA_PATH);
     let ref tosca_string = fs::read_to_string(path).unwrap();
     let tosca_json = serde_yaml::from_str::<serde_json::Value>(&tosca_string).unwrap();
 
