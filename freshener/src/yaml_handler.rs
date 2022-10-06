@@ -3,6 +3,7 @@ use crate::{tosca_types::*};
 use serde::{Deserialize, Serialize};
 use std::{fs, io::Write, path::Path};
 use walkdir::WalkDir;
+use colored::Colorize;
 
 const IGNORE_LIST_PATH: &str = "./ignore-list.yaml";
 const TOSCA_PATH: &str = "./mTOSCA/mtosca.yaml";
@@ -22,21 +23,23 @@ struct IgnoreList {
 
 pub fn deployment_has_direct_access(deployment: K8SManifest) -> bool {
 
-    let host_network: bool = if let Some(_hn) = deployment.spec.hostNetwork { true } else { false };
+    if let Some(host_network) = deployment.spec.hostNetwork {
+        if host_network {
+            return true;
+        }
+    }
 
-    if !host_network {
-        if let Some(containers) = deployment.spec.containers {
-            for container in containers {
-                if let Some(ports) = container.ports {
-                    let has_host_port = ports.into_iter().any(|port| !port.hostPort.is_none());
-                    if has_host_port {
-                        return true
-                    }
+    if let Some(containers) = deployment.spec.containers {
+        for container in containers {
+            if let Some(ports) = container.ports {
+                let has_host_port = ports.into_iter().any(|port| !port.hostPort.is_none());
+                if has_host_port {
+                    return true
                 }
             }
         }
     }
-
+    
     false
 }
 
@@ -127,7 +130,7 @@ pub fn parse_manifests(manifests: &mut Vec<K8SManifest>) {
         }
     } 
 
-    println!("[*] Parsing done\n");
+    println!("{}", format!("[*] Parsing done\n").green().bold());
 }
 
 pub fn parse_tosca(nodes: &mut Vec<NodeTemplate>) {

@@ -7,6 +7,7 @@ pub struct Port {
     pub hostPort: Option<i32>,
 }
 
+#[derive(Debug)]
 pub struct K8sToscaNode {
     pub kind: String,
     pub has_service: bool,
@@ -40,19 +41,21 @@ pub struct Template {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Selector {
-    pub app: Option<String>
+    pub service: Option<String>
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct OutlierDetection {
-    pub consecutive5xxErrors: Option<i32>,
+    #[serde(rename = "consecutive5xxErrors")]
+    pub consecutive_errors: Option<i32>,
     pub interval: Option<String>
 
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct TrafficPolicy {
-    pub outlierDetection: Option<OutlierDetection>
+    #[serde(rename = "outlierDetection")]
+    pub outlier_detection: Option<OutlierDetection>
 }
 
 #[derive(Debug, Clone, Deserialize)]

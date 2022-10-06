@@ -1,36 +1,29 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: payments
+  name: categories
   labels:
-    service: payments
-    stage: prod
+    service: categories
 spec:
-  hostNetwork: true
   replicas: 1
   selector:
     matchLabels:
-      service: payments
-      stage: prod
+      service: categories
   template:
     metadata:
       labels:
-        service: payments
-        stage: prod
+        service: categories
     spec:
       serviceAccountName: robot-shop
       containers:
-      - name: payments
-        image: robotshop/rs-payments:latest
+      - name: categories
+        image: robotshop/rs-categories:latest
         imagePullPolicy: IfNotPresent
-        # agent networking access
         env:
           - name: INSTANA_AGENT_HOST
             valueFrom:
               fieldRef:
                 fieldPath: status.hostIP
-          - name: PAYMENT_GATEWAY
-            value: null
         ports:
         - containerPort: 8080
         resources:
@@ -45,13 +38,13 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: payments-srv
   labels:
-    service: payments
+    service: categories
+  name: categories-srv
 spec:
   ports:
   - name: http
     port: 8080
     targetPort: 8080
   selector:
-    service: payments
+    service: categories

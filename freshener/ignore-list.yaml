@@ -14,5 +14,8 @@ images:
 - name: envoy
   image: envoyproxy/envoy
   kind: sidecar
+- name: rabbitmq
+  image: rabbitmq
+  kind: messageBroker
 manifests:
 - posts-srv.yaml

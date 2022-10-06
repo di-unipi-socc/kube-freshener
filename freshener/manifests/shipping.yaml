@@ -21,6 +21,7 @@ spec:
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
+        - hostPort: 4000
         # it's Java it needs lots of memory
         resources:
           limits:

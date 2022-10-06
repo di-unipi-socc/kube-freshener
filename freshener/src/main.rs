@@ -11,6 +11,7 @@ use tosca_types::NodeTemplate;
 use crate::{yaml_handler::KnownImage};
 use crate::{k8s_types::*};
 use crate::{cmd_handler::CMD};
+use colored::Colorize;
 
 
 fn main() {
@@ -21,7 +22,15 @@ fn main() {
         let mut manifests: Vec<K8SManifest> = Vec::new();
         let mut tosca_nodes: Vec<NodeTemplate> = Vec::new();
           
+        println!("{}", format!("########################").bold());
+        println!("{}", format!("####### PARSING ########").bold());
+        println!("{}", format!("########################\n").bold());
+
         startup(&mut tosca_nodes, &mut manifests);
+
+        println!("{}", format!("########################").bold());
+        println!("{}", format!("### START INSPECTION ###").bold());
+        println!("{}", format!("########################\n").bold());
 
         freshener::check_independent_depl(&manifests);
         freshener::check_no_apigateway(&manifests);

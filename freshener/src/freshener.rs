@@ -1,4 +1,6 @@
-use std::{collections::HashMap};
+use std::{collections::{HashMap, HashSet}};
+
+use colored::Colorize;
 
 use crate::{k8s_types::*, tosca_types::*, yaml_handler};
 
@@ -10,6 +12,15 @@ pub fn check_wobbly_interaction(
 ) {
     let ref virtual_services = yaml_handler::get_virtual_services(manifests);
     let ref dest_rules = yaml_handler::get_destination_rules(manifests);
+    let mut node_set: HashSet<String> = HashSet::new();
+
+    for node in nodes {
+        if let (Some(name), Some(kind)) = (&node.name, &node.kind) {
+            if kind != "micro.nodes.Datastore" && kind != "micro.nodes.MessageRouter" && kind != "micro.nodes.MessageBroker" {
+                node_set.insert(name.to_string());
+            }
+        }
+    }
 
     for node in nodes {
         if let Some(requirements) = &node.requirements {
@@ -26,7 +37,7 @@ pub fn check_wobbly_interaction(
                         }
                     }
                 }
-
+                
                 // given the destination node I have to check if there is a virtual service
                 // having spec.hosts = dest_node_name or a destination rule having
                 // spec.host = dest_node_n
@@ -43,21 +54,23 @@ pub fn check_wobbly_interaction(
                     });
 
                 let has_outlier_detection = dest_rules
-                .into_iter()
-                .any(|m| {
-                    if let (Some(host), Some(traffic_policy)) = (&m.spec.host, &m.spec.trafficPolicy) {
-                        return *host == dest_node_name && !traffic_policy.outlierDetection.is_none()
-                    }
+                    .into_iter()
+                    .any(|m| {
+                        if let (Some(host), Some(traffic_policy)) = (&m.spec.host, &m.spec.trafficPolicy) {
+                            return *host == dest_node_name && !traffic_policy.outlier_detection.is_none()
+                        }
 
-                    false
-                });
+                        false
+                    });
 
-                if !has_virtual_service && !has_outlier_detection {
+                if !has_virtual_service && !has_outlier_detection && node_set.contains(&dest_node_name) {
                     println!(
-                        "[Smell occurred - Wobbly Interaction]\nService named {} is reached by \
+                        "{}Service named {} is reached by \
                         a service named {} without any circuit breaker or timeout: resolve the occurrence of wobbly \
                         service interactions smells by adding circuit_breaker and/or and timeout in between .\n",
-                        dest_node_name, node.name.as_ref().unwrap()
+                        format!("[Smell occurred - Wobbly Interaction]\n").red().bold(),
+                        dest_node_name, 
+                        node.name.as_ref().unwrap()
                     );
                 }
             }
@@ -75,6 +88,7 @@ pub fn check_endpoint_based_interaction(
     // save nodes types
     for node in nodes {
         if let (Some(name), Some(kind)) = (&node.name, &node.kind) {
+            // println!("{} - {}", name, kind);
             // I want to obtain deployment details to get a possible host port
             let deployment = yaml_handler::get_deployment_named(name.to_string(), manifests);
             if let Some(depl) = deployment {
@@ -94,7 +108,7 @@ pub fn check_endpoint_based_interaction(
 
     for service in services {
         if let Some(selector) = service.spec.selector {
-            if let Some(name) = selector.app {
+            if let Some(name) = selector.service {
                 // if exists a service with the selector.app = tosca service name
                 if let Some(node) = node_hashmap.get(&name) {
                     // set the bool as true so that we can identify tosca services that have
@@ -145,10 +159,10 @@ pub fn check_endpoint_based_interaction(
                         if dest_node.has_direct_access {
                             // possible smell
                             println!(
-                                "[Smell occurred - Endpoint Based Interaction]\nService named {} is reached by \
+                                "{}Service named {} is reached by \
                                 a service named {}, but it is direct reachable using a host port that you declared. \
-                                To solve this smell please remove any host network and host port and usea k8s \
-                                service instead.\n",
+                                To solve this smell please remove any host network and host port\n",
+                                format!("[Smell occurred - Endpoint Based Interaction]\n").red().bold(),
                                 node_name, node.name.as_ref().unwrap()
                             );
                         }
@@ -156,11 +170,12 @@ pub fn check_endpoint_based_interaction(
                         if !dest_node.has_service {
                             // possible smell
                             println!(
-                                "[Smell occurred - Endpoint Based Interaction]\nService named {} is reached by \
+                                "{}Service named {} is reached by \
                                 a service named {}, but there's no k8s service associated with it. \
                                 Therefore destination service could be reached with a hardcoded address. \
-                                To solve this smell please remove any host network and host port and usea k8s \
+                                To solve this smell please remove any host network and host port and use a k8s \
                                 service instead .\n",
+                                format!("[Smell occurred - Endpoint Based Interaction]\n").red().bold(),
                                 node_name, node.name.as_ref().unwrap()
                             );
                         }
@@ -199,7 +214,6 @@ pub fn check_no_apigateway(manifests: &Vec<K8SManifest>) {
         }
         
     }
-    println!("\n");
 }
 
 pub fn check_independent_depl(manifests: &Vec<K8SManifest>) {
@@ -240,9 +254,10 @@ fn analyze_containers_mspc(containers: &Vec<Container>) {
         if !(has_pattern || has_known_sidecar) {
             if !main_container_name.is_empty() {
                 println!(
-                    "[Smell occurred - Independent Deployability]\nContainer named {} may not be a sidecar, \
+                    "{}Container named {} may not be a sidecar, \
                     because it has {} as an image,\nso we cannot ensure that this container is a proper sidecar. \
                     Therefore it can potentially violate the Independent Deployability rule\n",
+                    format!("[Smell occurred - Independent Deployability]\n").red().bold(),
                     container.name, container.image
                 );
                 continue;
@@ -256,11 +271,12 @@ fn analyze_containers_nag(containers: &Vec<Container>, host_network: bool) {
     for container in containers {
         if host_network && !implements_message_routing(container.image.clone()) {
             println!(
-                "[Smell occurred - No API Gateway]\nHostNetwork is set to true and container's (named '{}'), \
+                "{}HostNetwork is set to true and container's (named '{}'), \
                 image '{}' may not be a proper message routing implementation and \
                 this could be a potential no api gateway smell.\nIf you were to be sure that \
                 your image implements message routing, then we suggest you to add the image \
                 in the ignore list using cargo run add-ignore <name> <image> <kind>.\n",
+                format!("[Smell occurred - No API Gateway]\n").red().bold(),
                 container.name, container.image
             );
         }
@@ -273,12 +289,14 @@ fn analyze_containers_nag(containers: &Vec<Container>, host_network: bool) {
             // an official Docker image that implements message routing
             if has_host_port && !implements_message_routing(container.image.clone()) {
                 println!(
-                    "[Smell occurred - No API Gateway]\nContainer named '{}' has an hostPort associated, \
+                    "{}Container named '{}' has an hostPort associated, \
                     the container's image '{}' may not be a proper message routing implementation and \
                     this could be a potential no api gateway smell.\nIf you were to be sure that \
                     your image implements message routing, then we suggest you to add the image \
                     in the ignore list using cargo run add-ignore <name> <image> <kind>.\n",
-                    container.name, container.image
+                    format!("[Smell occurred - No API Gateway]\n").red().bold(),
+                    container.name,
+                    container.image
                 );
             }
         }

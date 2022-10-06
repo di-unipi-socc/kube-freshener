@@ -12,15 +12,15 @@ topology_template:
     products:
       type: micro.nodes.Service
       requirements:
-      - interaction: products_db
+      - interaction: mysql
       - interaction: cart
-    products_db:
+    mysql:
       type: micro.nodes.Datastore
     categories:
       type: micro.nodes.Service
       requirements:
-      - interaction: categories_db
-    categories_db:
+      - interaction: mongodb
+    mongodb:
       type: micro.nodes.Datastore
     rabbitmq:
       type: micro.nodes.MessageBroker

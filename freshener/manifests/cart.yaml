@@ -5,6 +5,7 @@ metadata:
   labels:
     service: cart
 spec:
+  hostNetwork: false
   replicas: 1
   selector:
     matchLabels:
@@ -38,7 +39,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: cart-srv
+  name: cart
 spec:
   ports:
   - name: http
