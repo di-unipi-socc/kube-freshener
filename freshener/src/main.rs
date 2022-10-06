@@ -13,7 +13,6 @@ use crate::{k8s_types::*};
 use crate::{cmd_handler::CMD};
 use colored::Colorize;
 
-
 fn main() {
 
     let args: Vec<String> = env::args().collect();
@@ -22,15 +21,13 @@ fn main() {
         let mut manifests: Vec<K8SManifest> = Vec::new();
         let mut tosca_nodes: Vec<NodeTemplate> = Vec::new();
           
-        println!("{}", format!("########################").bold());
-        println!("{}", format!("####### PARSING ########").bold());
-        println!("{}", format!("########################\n").bold());
+        println!("{}\n", format!("*** K8S FRESHENER ***").blue().bold());
+
+        println!("{}", format!("####### Parsing ########").bold());
 
         startup(&mut tosca_nodes, &mut manifests);
 
-        println!("{}", format!("########################").bold());
-        println!("{}", format!("### START INSPECTION ###").bold());
-        println!("{}", format!("########################\n").bold());
+        println!("{}", format!("### Start Inspection ###").bold());
 
         freshener::check_independent_depl(&manifests);
         freshener::check_no_apigateway(&manifests);
