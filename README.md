@@ -11,3 +11,5 @@ To make it run just execute `cargo run` in the project folder. There's the possi
 - `cargo run delete-manifest-ignore <name>`: stop ignoring a manifest previously added
 
 The main `cargo run` allows you to execute the tool that will explore the manifests folder and asap it will return the analysis in terms of which are the smells found and how to solve them.
+
+![](https://github.com/di-unipi-socc/k8s-freshener/blob/main/imgs/screen.png)
