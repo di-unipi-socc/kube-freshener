@@ -1,4 +1,5 @@
 pub enum CMD {
+    Analyze,
     ListKnownImages,
     ListManifestsIgnore,
     AddKnownImage,
@@ -19,6 +20,7 @@ impl CMD {
 
     pub fn from_str(s: &str) -> Self {
         match s {
+            "analyze" => Self::Analyze,
             "list-known-images" => Self::ListKnownImages,
             "list-manifest-ignore" => Self::ListManifestsIgnore,
             "add-known-image" => Self::AddKnownImage,
@@ -31,6 +33,7 @@ impl CMD {
 
     pub fn to_str(&self) -> &str {
         match self {
+            Self::Analyze => "analyze",
             Self::ListKnownImages => "list-known-images",
             Self::ListManifestsIgnore => "list-manifest-ignore",
             Self::AddKnownImage => "add-known-image",

@@ -49,10 +49,7 @@ pub fn get_deployment_named(name: String, manifests: &Vec<K8SManifest>) -> Optio
     deployments
         .into_iter()
         .find(|d| {
-            if let Some(m) = &d.metadata {
-                return m.name == name
-            }
-            false
+            return *d.metadata.name == name
         })
 }
 
@@ -242,6 +239,35 @@ fn update_ignore(converted_ignore_list: IgnoreList) {
     f.write_all(yaml.as_bytes()).expect("Unable to write all");
     f.flush().expect("Unable to flush");
     fs::write(IGNORE_LIST_PATH, yaml).expect("Unable to write file");
+}
+
+pub fn update_manifest(manifest: K8SManifest, filename: String) {
+
+    for entry in WalkDir::new("./manifests")
+        .follow_links(true)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
+        let file_name = entry.file_name().to_string_lossy();
+        let f = file_name.to_string();
+        let path = entry.path().to_str();
+
+        if f == filename {
+            if let Some(path) = path {
+                let yaml = serde_yaml::to_string(&manifest).unwrap();
+                let mut f = fs::OpenOptions::new()
+                    .write(true)
+                        .truncate(true)
+                        .open(path)
+                        .expect("Unable to open the file");
+                    f.write_all(yaml.as_bytes()).expect("Unable to write all");
+                    f.flush().expect("Unable to flush");
+                fs::write(path, yaml).expect("Unable to write file");
+            
+            }
+        }
+        
+    }
 }
 
 /// It reads a file and then tries to parse to a DeserializeOwned T

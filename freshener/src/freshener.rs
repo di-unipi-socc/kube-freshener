@@ -198,7 +198,7 @@ pub fn check_no_apigateway(manifests: &Vec<K8SManifest>) {
         message routing components then a horizontal scalability violation can occur
         */
         let containers = &manifest.spec.containers;
-        // TODO: do the host_network check
+        
         let host_network: bool = if let Some(hn) = &manifest.spec.hostNetwork { *hn } else { false };
 
         if let Some(conts) = containers {
@@ -216,30 +216,59 @@ pub fn check_no_apigateway(manifests: &Vec<K8SManifest>) {
     }
 }
 
-pub fn check_independent_depl(manifests: &Vec<K8SManifest>) {
+pub fn check_independent_depl(manifests: &Vec<K8SManifest>, solve: bool) {
 
     let deployment_manifests = yaml_handler::get_deployments_pods(manifests);
 
     for manifest in deployment_manifests {
+        if manifest.metadata.name != "catalogue" { continue; }
+        let mut manifest_cpy = manifest.clone();
+        let filename = format!("{}{}", manifest.metadata.name, ".yaml");
         let containers = &manifest.spec.containers;
 
         // checking independent deployability
-        if let Some(containers) = containers {
-            analyze_containers_mspc(containers);
-        }
-
-        if let Some(template) = manifest.spec.template {
-            if let Some(spec) = template.spec {
-                if let Some(nested_containers) = spec.containers {
-                    analyze_containers_mspc(&nested_containers);
+        if manifest.kind == "Pod" {
+            if let Some(mut containers) = containers.clone() {
+                let refactored_containers = analyze_containers_mspc(&mut containers, manifest.metadata.name.clone());
+                manifest_cpy.spec.containers = Some(refactored_containers);
+             }
+        } else {
+            if let Some(template) = manifest.spec.template {
+                if let Some(spec) = template.spec {
+                    if let Some(mut nested_containers) = spec.containers {
+                        let refactored_containers = analyze_containers_mspc(&mut nested_containers, manifest.metadata.name);
+                        let _spec = TemplateSpec {
+                            initContainers: spec.initContainers,
+                            containers: Some(refactored_containers),
+                            volumes: spec.volumes
+                        };
+                        let _template = Template {
+                            spec: Some(_spec)
+                        };
+                        manifest_cpy.spec.template = Some(_template);
+                        manifest_cpy.spec.containers = None;
+                    }
                 }
             }
         }
+
+        // manifest_cpy is the refactored manifest
+        // now if solve flag is set as true we can
+        // override the "manifest.metadata.name".yaml
+        // with the refactored version
+        if solve {
+            yaml_handler::update_manifest(manifest_cpy, filename);
+        }
+
     }
 }
 
-fn analyze_containers_mspc(containers: &Vec<Container>) {
+/// it returns the refactored vector of containers
+fn analyze_containers_mspc(containers: &Vec<Container>, metadata_name: String) -> Vec<Container> {
     let mut main_container_name = String::new();
+    let mut result_containers: Vec<Container> = Vec::new();
+    result_containers = containers.clone();
+
     for container in containers {
         let has_pattern = get_patterns().iter()
             .any(|pattern| -> bool {
@@ -254,17 +283,31 @@ fn analyze_containers_mspc(containers: &Vec<Container>) {
         if !(has_pattern || has_known_sidecar) {
             if !main_container_name.is_empty() {
                 println!(
-                    "{}Container named {} may not be a sidecar, \
+                    "{}{}\nContainer named {} may not be a sidecar, \
                     because it has {} as an image,\nso we cannot ensure that this container is a proper sidecar. \
                     Therefore it can potentially violate the Independent Deployability rule\n",
                     format!("[Smell occurred - Independent Deployability]\n").red().bold(),
+                    format!("[Metadata name: {}]", metadata_name).yellow().bold(),
                     container.name, container.image
                 );
+
+                // solving by creating a new pod named as the "wrong" container name
+                // and with the same image
+                
+
+                // then remove the "wrong" container from the current pod/deployment
+                result_containers = result_containers
+                    .into_iter()
+                    .filter(|c| c.name != container.name)
+                    .collect();
+            
                 continue;
             } 
             main_container_name = container.name.clone();
         }
     }
+
+    result_containers
 }
 
 fn analyze_containers_nag(containers: &Vec<Container>, host_network: bool) {
