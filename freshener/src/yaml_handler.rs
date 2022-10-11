@@ -1,6 +1,7 @@
 use crate::{k8s_types::*, yaml_handler};
 use crate::{tosca_types::*};
 use serde::{Deserialize, Serialize};
+use std::fs::File;
 use std::{fs, io::Write, path::Path};
 use walkdir::WalkDir;
 use colored::Colorize;
@@ -204,6 +205,38 @@ pub fn add_manifest_ignore(filename: String) {
     converted_ignore_list.manifests.push(filename);
 
     update_ignore(converted_ignore_list);
+}
+
+pub fn create_pod_from(container: &Container) {
+    let mut path = String::from("./manifests/");
+    path.push_str(&container.name);
+    path.push_str(".yaml");
+    
+    let mut file = File::create(path)
+        .expect("Error encountered while creating file!");
+
+    let manifest = K8SManifest {
+        api_version: String::from("apps/v1"),
+        kind: String::from("Pod"),
+        metadata: Metadata { name: container.name.clone() },
+        spec: Spec { 
+            initContainers: None,
+            containers: Some(vec![container.clone()]),
+            volumes: None,
+            template: None,
+            hostNetwork: None,
+            selector: None,
+            hosts: None,
+            host: None,
+            trafficPolicy: None,
+            replicas: None,
+            restartPolicy: None
+        }
+    };
+
+    let yaml = serde_yaml::to_string(&manifest).unwrap();
+
+    file.write_all(yaml.as_bytes());
 }
 
 /// It deletes an IngoreItem from the known-images list

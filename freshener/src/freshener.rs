@@ -293,6 +293,7 @@ fn analyze_containers_mspc(containers: &Vec<Container>, metadata_name: String) -
 
                 // solving by creating a new pod named as the "wrong" container name
                 // and with the same image
+                yaml_handler::create_pod_from(container);
                 
 
                 // then remove the "wrong" container from the current pod/deployment

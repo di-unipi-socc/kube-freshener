@@ -101,7 +101,8 @@ pub struct Metadata { pub name: String }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[allow(non_snake_case)]
 pub struct K8SManifest {
-    pub apiVersion: String,
+    #[serde(rename = "apiVersion")]
+    pub api_version: String,
     pub kind: String,
     pub metadata: Metadata,
     pub spec: Spec,
