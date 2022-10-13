@@ -123,10 +123,10 @@ pub fn check_endpoint_based_interaction(
     }
 }
 
-pub fn check_no_apigateway(manifests: &Vec<K8SManifest>) {
+pub fn check_no_apigateway(manifests: &Vec<K8SManifest>, solve: bool) {
     let deployment_manifest = yaml_handler::get_deployments_pods(manifests);
 
-    for manifest in deployment_manifest.into_iter() {
+    for mut manifest in deployment_manifest {
         /* 
         if hostNetwork is set as true or inside a container there's ports.-hostPort,
         and there's no image that represent an official Docker image that implements
@@ -136,20 +136,57 @@ pub fn check_no_apigateway(manifests: &Vec<K8SManifest>) {
         
         let host_network: bool = if let Some(hn) = &manifest.spec.hostNetwork { *hn } else { false };
 
+        if solve && host_network {
+            manifest.spec.hostNetwork = None;
+            let filename = format!("{}{}", manifest.metadata.name, ".yaml");
+            // println!("{} has been modified with\n{:#?}", filename, man);
+            yaml_handler::update_manifest(manifest.clone(), filename); 
+        }
+
+        // if manifest represents a pod
         if let Some(conts) = containers {
-            analyze_containers_nag(manifest.metadata.name.clone(), &conts, host_network);
+            let result = analyze_containers_nag(&manifest, &conts, host_network);
+
+            if result.1 && solve {
+                let filename = format!("{}{}", manifest.metadata.name, ".yaml");
+                let mut manifest_cpy = manifest.clone();
+                manifest_cpy.spec.containers = Some(result.0);
+                // println!("{} has been modified with\n{:#?}", filename, man);
+                yaml_handler::update_manifest(manifest_cpy, filename); 
+            }
+
+            return
         }
         
-        if let Some(template) = manifest.spec.template {
-            if let Some(nested_containers) = template.spec.containers {
-                analyze_containers_nag(manifest.metadata.name.clone(), &nested_containers, host_network);
+        // if manifest represents a deployment
+        if let Some(template) = &manifest.spec.template {
+            if let Some(nested_containers) = &template.spec.containers {
+                let result = analyze_containers_nag(&manifest, &nested_containers, host_network);
+                
+                if result.1 && solve {
+                    let filename = format!("{}{}", manifest.metadata.name, ".yaml");
+                    let mut manifest_cpy = manifest.clone();
+                    
+                    if let Some(template) = manifest.spec.template {
+                        let _templae_spec = TemplateSpec {
+                            initContainers: template.spec.initContainers,
+                            containers: Some(result.0),
+                            volumes: template.spec.volumes
+                        };
+                        let _template = Template { spec: _templae_spec };
+                        manifest_cpy.spec.template = Some(_template);
+                        manifest_cpy.spec.containers = None;
+                    }
+                    
+                    // println!("{} has been modified with\n{:#?}", filename, man);
+                    yaml_handler::update_manifest(manifest_cpy, filename); 
+                }
             }
         }
-        
     }
 }
 
-pub fn check_independent_depl(manifests: &Vec<K8SManifest>, solve: bool) {
+pub fn check_independent_depl(manifests: &Vec<K8SManifest>, is_to_refactor: bool) {
 
     let deployment_manifests = yaml_handler::get_deployments_pods(manifests);
 
@@ -162,13 +199,13 @@ pub fn check_independent_depl(manifests: &Vec<K8SManifest>, solve: bool) {
         // checking independent deployability
         if manifest.kind == "Pod" {
             if let Some(mut containers) = containers.clone() {
-                let refactored_containers = analyze_multiple_containers(&mut containers, manifest.metadata.name.clone(), solve);
+                let refactored_containers = analyze_multiple_containers(&mut containers, manifest.metadata.name.clone(), is_to_refactor);
                 manifest_cpy.spec.containers = Some(refactored_containers);
              }
         } else {
             if let Some(template) = manifest.spec.template {
                 if let Some(mut nested_containers) = template.spec.containers {
-                    let refactored_containers = analyze_multiple_containers(&mut nested_containers, manifest.metadata.name, solve);
+                    let refactored_containers = analyze_multiple_containers(&mut nested_containers, manifest.metadata.name, is_to_refactor);
                     let _spec = TemplateSpec {
                         initContainers: template.spec.initContainers,
                         containers: Some(refactored_containers),
@@ -187,7 +224,7 @@ pub fn check_independent_depl(manifests: &Vec<K8SManifest>, solve: bool) {
         // now if solve flag is set as true we can
         // override the "manifest.metadata.name".yaml
         // with the refactored version
-        if solve {
+        if is_to_refactor {
             yaml_handler::update_manifest(manifest_cpy, filename);
         }
 
@@ -195,7 +232,7 @@ pub fn check_independent_depl(manifests: &Vec<K8SManifest>, solve: bool) {
 }
 
 /// it returns the refactored vector of containers
-fn analyze_multiple_containers(containers: &Vec<Container>, metadata_name: String, solve: bool) -> Vec<Container> {
+fn analyze_multiple_containers(containers: &Vec<Container>, metadata_name: String, is_to_refactor: bool) -> Vec<Container> {
     let mut main_container_name = String::new();
     let mut result_containers: Vec<Container> = containers.clone();
 
@@ -233,7 +270,7 @@ fn analyze_multiple_containers(containers: &Vec<Container>, metadata_name: Strin
 
                 // solving by creating a new pod named as the "wrong" container name
                 // and with the same image
-                if solve {
+                if is_to_refactor {
                     yaml_handler::create_pod_from(container);
                 }
 
@@ -252,17 +289,19 @@ fn analyze_multiple_containers(containers: &Vec<Container>, metadata_name: Strin
     result_containers
 }
 
-fn analyze_containers_nag(manifest_name: String, containers: &Vec<Container>, host_network: bool) {
+fn analyze_containers_nag(manifest: &K8SManifest, containers: &Vec<Container>, host_network: bool) -> (Vec<Container>, bool) {
+    let mut result_containers: Vec<Container> = Vec::new();
+    let mut has_to_update = false;
+
     for container in containers {
-        if host_network && !implements_message_routing(manifest_name.clone(), container.image.clone()) {
+        let mut c = container.clone();
+        if host_network && !implements_message_routing(manifest.metadata.name.clone(), container.image.clone()) {
             println!(
                 "{}{}\nHostNetwork is set to true and container's (named '{}'), \
                 image '{}' may not be a proper message routing implementation and \
-                this could be a potential no api gateway smell.\nIf you were to be sure that \
-                your image implements message routing, then we suggest you to add the image \
-                in the ignore list using cargo run add-ignore <name> <image> <kind>.\n",
+                this could be a potential no api gateway smell.\n",
                 format!("[Smell occurred - No API Gateway]\n").red().bold(),
-                format!("[Metadata name: {}]", manifest_name).yellow().bold(),
+                format!("[Metadata name: {}]", &manifest.metadata.name).yellow().bold(),
                 container.name, 
                 container.image
             );
@@ -274,21 +313,28 @@ fn analyze_containers_nag(manifest_name: String, containers: &Vec<Container>, ho
 
             // if it's true, then we have to verify that the current container is running
             // an official Docker image that implements message routing
-            if has_host_port && !implements_message_routing(manifest_name.clone(), container.image.clone()) {
+            if has_host_port && !implements_message_routing(manifest.metadata.name.clone(), container.image.clone()) {
                 println!(
                     "{}{}\nContainer named '{}' has an hostPort associated, \
                     the container's image '{}' may not be a proper message routing implementation and \
-                    this could be a potential no api gateway smell.\nIf you were to be sure that \
-                    your image implements message routing, then we suggest you to add the image \
-                    in the ignore list using cargo run add-ignore <name> <image> <kind>.\n",
+                    this could be a potential no api gateway smell.\n",
                     format!("[Smell occurred - No API Gateway]\n").red().bold(),
-                    format!("[Metadata name: {}]", manifest_name).yellow().bold(),
+                    format!("[Metadata name: {}]", &manifest.metadata.name).yellow().bold(),
                     container.name,
                     container.image,
                 );
+
+                c.ports = None;
+
+                has_to_update = true;
             }
         }
+
+        result_containers.push(c);
     }
+
+    (result_containers, has_to_update)
+
 }
 
 fn implements_message_routing(pod_name: String, image_name: String) -> bool {

@@ -33,10 +33,10 @@ fn main() {
             startup(&mut manifests);
             println!("{}", format!("### Start Inspection ###").bold());
 
-            let solve = args.len() >= 3 && args[2].clone() == "-s";
+            let is_to_refactor = args.len() >= 3 && args[2].clone() == "-s";
 
-            freshener::check_independent_depl(&manifests, solve);
-            freshener::check_no_apigateway(&manifests);
+            freshener::check_independent_depl(&manifests, is_to_refactor);
+            freshener::check_no_apigateway(&manifests, is_to_refactor);
             freshener::check_endpoint_based_interaction(&manifests);
             freshener::check_wobbly_interaction(&manifests);
         },

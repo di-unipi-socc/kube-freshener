@@ -168,7 +168,7 @@ pub fn create_pod_from(container: &Container) {
 
     let yaml = serde_yaml::to_string(&manifest).unwrap();
 
-    file.write_all(yaml.as_bytes()).expect_err("Can't create pod file");
+    file.write_all(yaml.as_bytes());
 }
 
 pub fn update_manifest(manifest: K8SManifest, filename: String) {

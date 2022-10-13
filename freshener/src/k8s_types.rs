@@ -3,7 +3,7 @@ use serde::{Serialize, Deserialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[allow(non_snake_case)]
 pub struct Port {
-    pub containerPort: Option<i32>,
+    // pub containerPort: Option<i32>,
     pub hostPort: Option<i32>,
 }
 
@@ -95,7 +95,9 @@ pub struct Spec {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Metadata { pub name: String }
+pub struct Metadata { 
+    pub name: String
+ }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[allow(non_snake_case)]

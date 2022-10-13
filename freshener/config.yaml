@@ -4,9 +4,6 @@ smells:
     containers:
     - dynatrace
   noapigateway: 
-  - name: shipping
-    containers:
-    - shipping
   - name: catalogue
     containers:
     - search-engine
