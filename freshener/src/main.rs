@@ -3,12 +3,12 @@ mod yaml_handler;
 mod freshener;
 mod cmd_handler;
 mod tosca_types;
+mod config_type;
 
 use std::env;
 
 use tosca_types::NodeTemplate;
 
-use crate::{yaml_handler::KnownImage};
 use crate::{k8s_types::*};
 use crate::{cmd_handler::CMD};
 use colored::Colorize;
@@ -43,37 +43,6 @@ fn main() {
             freshener::check_endpoint_based_interaction(&manifests, &tosca_nodes);
             freshener::check_wobbly_interaction(&manifests, &tosca_nodes);
         },
-        CMD::ListKnownImages => yaml_handler::read_known_imgaes(),
-        CMD::ListManifestsIgnore => yaml_handler::read_manifest_ignore(),
-        CMD::AddKnownImage => {
-            if CMD::check_args(&command, &args) {
-                let known_image = KnownImage {
-                    name: args[2].clone(),
-                    image: args[3].clone(),
-                    kind: args[4].clone(),
-                };
-    
-                yaml_handler::add_known_image(known_image);
-            }
-        },
-        CMD::AddManifestIgnore => {
-            if CMD::check_args(&command, &args) {
-                let filename = args[2].clone().to_owned();
-                yaml_handler::add_manifest_ignore(filename);
-            }
-        },
-        CMD::DeleteKnownImage => {
-            if CMD::check_args(&command, &args) {
-                let name = args[2].clone().to_owned();
-                yaml_handler::delete_known_image(name);
-            }
-        },
-        CMD::DeleteManifestIgnore => {
-            if CMD::check_args(&command, &args) {
-                let name = args[2].clone().to_owned();
-                yaml_handler::delete_manifest_ignore(name);
-            }
-        }
         _ =>  println!("Unrecognized command")
     }
 

@@ -65,10 +65,11 @@ pub fn check_wobbly_interaction(
 
                 if !has_virtual_service && !has_outlier_detection && node_set.contains(&dest_node_name) {
                     println!(
-                        "{}Service named {} is reached by \
+                        "{}{}\nService named {} is reached by \
                         a service named {} without any circuit breaker or timeout: resolve the occurrence of wobbly \
                         service interactions smells by adding circuit_breaker and/or and timeout in between .\n",
                         format!("[Smell occurred - Wobbly Interaction]\n").red().bold(),
+                        format!("[Metadata name: {}]", dest_node_name).yellow().bold(),
                         dest_node_name, 
                         node.name.as_ref().unwrap()
                     );
@@ -147,6 +148,7 @@ pub fn check_endpoint_based_interaction(
                 // if an interaction is in the hashmap, then insert 
                 // and verify that it is not a micro.nodes.Datastore node
                 if let Some(dest_node) = node_hashmap.get(&node_name.to_string()) {
+                    // Add to ignore list 
                     if dest_node.kind != DATASTORE_TYPE {
                         // now we know that this interaction is not
                         // a Datastore object
@@ -202,13 +204,13 @@ pub fn check_no_apigateway(manifests: &Vec<K8SManifest>) {
         let host_network: bool = if let Some(hn) = &manifest.spec.hostNetwork { *hn } else { false };
 
         if let Some(conts) = containers {
-            analyze_containers_nag(&conts, host_network);
+            analyze_containers_nag(manifest.metadata.name.clone(), &conts, host_network);
         }
         
         if let Some(template) = manifest.spec.template {
             if let Some(spec) = template.spec {
                 if let Some(nested_containers) = spec.containers {
-                    analyze_containers_nag(&nested_containers, host_network);
+                    analyze_containers_nag(manifest.metadata.name.clone(), &nested_containers, host_network);
                 }
             }
         }
@@ -229,14 +231,14 @@ pub fn check_independent_depl(manifests: &Vec<K8SManifest>, solve: bool) {
         // checking independent deployability
         if manifest.kind == "Pod" {
             if let Some(mut containers) = containers.clone() {
-                let refactored_containers = analyze_containers_mspc(&mut containers, manifest.metadata.name.clone());
+                let refactored_containers = analyze_multiple_containers(&mut containers, manifest.metadata.name.clone(), solve);
                 manifest_cpy.spec.containers = Some(refactored_containers);
              }
         } else {
             if let Some(template) = manifest.spec.template {
                 if let Some(spec) = template.spec {
                     if let Some(mut nested_containers) = spec.containers {
-                        let refactored_containers = analyze_containers_mspc(&mut nested_containers, manifest.metadata.name);
+                        let refactored_containers = analyze_multiple_containers(&mut nested_containers, manifest.metadata.name, solve);
                         let _spec = TemplateSpec {
                             initContainers: spec.initContainers,
                             containers: Some(refactored_containers),
@@ -264,21 +266,31 @@ pub fn check_independent_depl(manifests: &Vec<K8SManifest>, solve: bool) {
 }
 
 /// it returns the refactored vector of containers
-fn analyze_containers_mspc(containers: &Vec<Container>, metadata_name: String) -> Vec<Container> {
+fn analyze_multiple_containers(containers: &Vec<Container>, metadata_name: String, solve: bool) -> Vec<Container> {
     let mut main_container_name = String::new();
     let mut result_containers: Vec<Container> = Vec::new();
     result_containers = containers.clone();
 
+    // check config file
+    let config = yaml_handler::get_config();
+
     for container in containers {
+        let node_config_element = config.smells.multiple_container.iter().find(|c| c.name == metadata_name);
         let has_pattern = get_patterns().iter()
             .any(|pattern| -> bool {
                 container.name.contains(pattern) || container.image.contains(pattern)
             });
     
-        let has_known_sidecar =  yaml_handler::get_known_imgaes().iter()
-            .any(|i| -> bool {
-                i.kind == "sidecar" && container.image.contains(&i.image)
-            });
+        let mut has_known_sidecar: bool = false;
+        
+        if let Some(node_element) = node_config_element {
+            if node_element.containers.is_none() { has_known_sidecar = false }
+            else {
+                has_known_sidecar = node_element.containers.as_ref().unwrap()
+                .iter()
+                .any(|c| *c == container.name);
+            }
+        }
                 
         if !(has_pattern || has_known_sidecar) {
             if !main_container_name.is_empty() {
@@ -286,15 +298,16 @@ fn analyze_containers_mspc(containers: &Vec<Container>, metadata_name: String) -
                     "{}{}\nContainer named {} may not be a sidecar, \
                     because it has {} as an image,\nso we cannot ensure that this container is a proper sidecar. \
                     Therefore it can potentially violate the Independent Deployability rule\n",
-                    format!("[Smell occurred - Independent Deployability]\n").red().bold(),
+                    format!("[Smell occurred - Multiple containers per Deployment]\n").red().bold(),
                     format!("[Metadata name: {}]", metadata_name).yellow().bold(),
                     container.name, container.image
                 );
 
                 // solving by creating a new pod named as the "wrong" container name
                 // and with the same image
-                yaml_handler::create_pod_from(container);
-                
+                if solve {
+                    yaml_handler::create_pod_from(container);
+                }
 
                 // then remove the "wrong" container from the current pod/deployment
                 result_containers = result_containers
@@ -311,17 +324,19 @@ fn analyze_containers_mspc(containers: &Vec<Container>, metadata_name: String) -
     result_containers
 }
 
-fn analyze_containers_nag(containers: &Vec<Container>, host_network: bool) {
+fn analyze_containers_nag(manifest_name: String, containers: &Vec<Container>, host_network: bool) {
     for container in containers {
-        if host_network && !implements_message_routing(container.image.clone()) {
+        if host_network && !implements_message_routing(manifest_name.clone(), container.image.clone()) {
             println!(
-                "{}HostNetwork is set to true and container's (named '{}'), \
+                "{}{}\nHostNetwork is set to true and container's (named '{}'), \
                 image '{}' may not be a proper message routing implementation and \
                 this could be a potential no api gateway smell.\nIf you were to be sure that \
                 your image implements message routing, then we suggest you to add the image \
                 in the ignore list using cargo run add-ignore <name> <image> <kind>.\n",
                 format!("[Smell occurred - No API Gateway]\n").red().bold(),
-                container.name, container.image
+                format!("[Metadata name: {}]", manifest_name).yellow().bold(),
+                container.name, 
+                container.image
             );
         }
 
@@ -331,22 +346,34 @@ fn analyze_containers_nag(containers: &Vec<Container>, host_network: bool) {
 
             // if it's true, then we have to verify that the current container is running
             // an official Docker image that implements message routing
-            if has_host_port && !implements_message_routing(container.image.clone()) {
+            if has_host_port && !implements_message_routing(manifest_name.clone(), container.image.clone()) {
                 println!(
-                    "{}Container named '{}' has an hostPort associated, \
+                    "{}{}\nContainer named '{}' has an hostPort associated, \
                     the container's image '{}' may not be a proper message routing implementation and \
                     this could be a potential no api gateway smell.\nIf you were to be sure that \
                     your image implements message routing, then we suggest you to add the image \
                     in the ignore list using cargo run add-ignore <name> <image> <kind>.\n",
                     format!("[Smell occurred - No API Gateway]\n").red().bold(),
+                    format!("[Metadata name: {}]", manifest_name).yellow().bold(),
                     container.name,
-                    container.image
+                    container.image,
                 );
             }
         }
     }
 }
 
-fn implements_message_routing(image_name: String) -> bool {
-    yaml_handler::get_known_imgaes().into_iter().any(|i| i.kind == "mr" && i.image == image_name)
+fn implements_message_routing(pod_name: String, image_name: String) -> bool {
+    if let Some(node_config_element) = yaml_handler::get_config()
+        .smells
+        .noapigateway
+        .iter()
+        .find(|c| c.name == pod_name) {
+            if node_config_element.containers.is_none() { return false }
+            return node_config_element.containers.as_ref().unwrap()
+                .iter()
+                .any(|c| *c == image_name) 
+    }
+
+    false
 }

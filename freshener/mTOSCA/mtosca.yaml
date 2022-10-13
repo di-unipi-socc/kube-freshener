@@ -8,7 +8,7 @@ topology_template:
       type: micro.nodes.Service
       requirements:
       - interaction: categories
-      - interaction: products
+      - interaction: mongodb
     products:
       type: micro.nodes.Service
       requirements:

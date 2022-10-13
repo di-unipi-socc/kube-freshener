@@ -1,0 +1,20 @@
+smells:
+  multiple_container:
+  - name: catalogue
+    containers:
+    - dynatrace
+  noapigateway: 
+  - name: shipping
+    containers:
+    - shipping
+    - rabbitmq
+  - name: payments
+  endpoint_based_interaction:
+  - frontend
+  wobbly:
+  - frontend 
+invoked_services:
+- shipping
+- catalogue
+ignored_manifests:
+- test.yaml

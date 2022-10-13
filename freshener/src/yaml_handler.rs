@@ -1,5 +1,5 @@
 use crate::{k8s_types::*, yaml_handler};
-use crate::{tosca_types::*};
+use crate::{tosca_types::*, config_type::*};
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::{fs, io::Write, path::Path};
@@ -7,20 +7,8 @@ use walkdir::WalkDir;
 use colored::Colorize;
 
 const IGNORE_LIST_PATH: &str = "./ignore-list.yaml";
+const CONFIG_PATH: &str = "./config.yaml";
 const TOSCA_PATH: &str = "./mTOSCA/mtosca.yaml";
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct KnownImage {
-    pub name: String,
-    pub image: String,
-    pub kind: String,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct IgnoreList {
-    images: Vec<KnownImage>,
-    manifests: Vec<String>,
-}
 
 pub fn deployment_has_direct_access(deployment: K8SManifest) -> bool {
 
@@ -157,54 +145,14 @@ pub fn parse_tosca(nodes: &mut Vec<NodeTemplate>) {
 
 }
 
-/// It prints out the knwon-images list
-pub fn read_known_imgaes() {
-    let converted_sidecar_list: IgnoreList = internal_read(IGNORE_LIST_PATH.to_owned());
+pub fn get_config() -> Config {
+    let converted_config: Config = internal_read(CONFIG_PATH.to_owned());
 
-    println!("{:#?}", converted_sidecar_list.images);
-}
-
-/// It prints out the manifests ignore list
-pub fn read_manifest_ignore() {
-    let converted_manifests_list: IgnoreList = internal_read(IGNORE_LIST_PATH.to_owned());
-
-    println!("{:#?}", converted_manifests_list.manifests);
-}
-
-pub fn get_known_imgaes() -> Vec<KnownImage> {
-    let converted_manifests_list: IgnoreList = internal_read(IGNORE_LIST_PATH.to_owned());
-
-    converted_manifests_list.images
+    converted_config
 }
 
 pub fn get_ignored_manifests() -> Vec<String> {
-    let converted_manifests_list: IgnoreList = internal_read(IGNORE_LIST_PATH.to_owned());
-
-    converted_manifests_list.manifests
-}
-
-/// It adds an IngoreItem to the known-images list
-pub fn add_known_image(item: KnownImage) {
-    let mut converted_ignore_list: IgnoreList = internal_read(IGNORE_LIST_PATH.to_owned());
-
-    println!(
-        "[*] Adding ({}, {}, {}) as a known image",
-        item.name, item.image, item.kind
-    );
-
-    converted_ignore_list.images.push(item);
-
-    update_ignore(converted_ignore_list);
-}
-
-pub fn add_manifest_ignore(filename: String) {
-    let mut converted_ignore_list: IgnoreList = internal_read(IGNORE_LIST_PATH.to_owned());
-
-    println!("[*] Adding '{}' as a manifest to ignore", filename);
-
-    converted_ignore_list.manifests.push(filename);
-
-    update_ignore(converted_ignore_list);
+    get_config().ignored_manifests
 }
 
 pub fn create_pod_from(container: &Container) {
@@ -237,41 +185,6 @@ pub fn create_pod_from(container: &Container) {
     let yaml = serde_yaml::to_string(&manifest).unwrap();
 
     file.write_all(yaml.as_bytes());
-}
-
-/// It deletes an IngoreItem from the known-images list
-pub fn delete_known_image(name: String) {
-    let mut converted_ignore_list: IgnoreList = internal_read(IGNORE_LIST_PATH.to_owned());
-
-    converted_ignore_list.images = converted_ignore_list.images
-        .into_iter()
-        .filter(|item| item.name != name)
-        .collect();
-
-    update_ignore(converted_ignore_list);
-}
-
-pub fn delete_manifest_ignore(name: String) {
-    let mut converted_ignore_list: IgnoreList = internal_read(IGNORE_LIST_PATH.to_owned());
-
-    converted_ignore_list.manifests = converted_ignore_list.manifests
-        .into_iter()
-        .filter(|item| *item != name)
-        .collect();
-
-    update_ignore(converted_ignore_list);
-}
-
-fn update_ignore(converted_ignore_list: IgnoreList) {
-    let yaml = serde_yaml::to_string(&converted_ignore_list).unwrap();
-    let mut f = fs::OpenOptions::new()
-        .write(true)
-        .truncate(true)
-        .open(IGNORE_LIST_PATH)
-        .expect("Unable to open the file");
-    f.write_all(yaml.as_bytes()).expect("Unable to write all");
-    f.flush().expect("Unable to flush");
-    fs::write(IGNORE_LIST_PATH, yaml).expect("Unable to write file");
 }
 
 pub fn update_manifest(manifest: K8SManifest, filename: String) {
