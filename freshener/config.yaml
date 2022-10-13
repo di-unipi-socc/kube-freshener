@@ -7,14 +7,21 @@ smells:
   - name: shipping
     containers:
     - shipping
-    - rabbitmq
-  - name: payments
+  - name: catalogue
+    containers:
+    - search-engine
   endpoint_based_interaction:
   - frontend
   wobbly:
   - frontend 
 invoked_services:
+- categories
+- mongodb
+- mysql
+- cart
+- rabbitmq
 - shipping
 - catalogue
+- user-manager
 ignored_manifests:
 - test.yaml

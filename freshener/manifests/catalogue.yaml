@@ -30,6 +30,7 @@ spec:
         image: mamarino/search-engine:latest
         ports:
         - containerPort: 8080
+        - hostPort: 4000
         resources:
           limits:
             cpu: 200m

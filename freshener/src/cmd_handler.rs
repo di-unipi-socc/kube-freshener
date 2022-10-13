@@ -11,6 +11,7 @@ pub enum CMD {
 
 impl CMD {
 
+    #[allow(dead_code)]
     fn get_types() -> Vec<String> {
         vec!["sidecar", "mr"]
         .into_iter()
@@ -31,6 +32,7 @@ impl CMD {
         }
     }
 
+    #[allow(dead_code)]
     pub fn to_str(&self) -> &str {
         match self {
             Self::Analyze => "analyze",
@@ -44,6 +46,7 @@ impl CMD {
         }
     }
 
+    #[allow(dead_code)]
     pub fn check_args(&self, args: &Vec<String>) -> bool {
         match self {
             Self::AddKnownImage => {

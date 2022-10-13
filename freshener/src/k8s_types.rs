@@ -8,8 +8,7 @@ pub struct Port {
 }
 
 #[derive(Debug)]
-pub struct K8sToscaNode {
-    pub kind: String,
+pub struct Microservice {
     pub has_service: bool,
     pub has_direct_access: bool
 }
@@ -57,7 +56,7 @@ pub struct TemplateSpec {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Template {
-    pub spec: Option<TemplateSpec>,
+    pub spec: TemplateSpec,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

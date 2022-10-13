@@ -1,14 +1,11 @@
 use crate::{k8s_types::*, yaml_handler};
-use crate::{tosca_types::*, config_type::*};
-use serde::{Deserialize, Serialize};
+use crate::{config_type::*};
 use std::fs::File;
-use std::{fs, io::Write, path::Path};
+use std::{fs, io::Write};
 use walkdir::WalkDir;
 use colored::Colorize;
 
-const IGNORE_LIST_PATH: &str = "./ignore-list.yaml";
 const CONFIG_PATH: &str = "./config.yaml";
-const TOSCA_PATH: &str = "./mTOSCA/mtosca.yaml";
 
 pub fn deployment_has_direct_access(deployment: K8SManifest) -> bool {
 
@@ -24,6 +21,19 @@ pub fn deployment_has_direct_access(deployment: K8SManifest) -> bool {
                 let has_host_port = ports.into_iter().any(|port| !port.hostPort.is_none());
                 if has_host_port {
                     return true
+                }
+            }
+        }
+    }
+
+    if let Some(template) = deployment.spec.template {
+        if let Some(containers) = template.spec.containers {
+            for container in containers {
+                if let Some(ports) = container.ports {
+                    let has_host_port = ports.into_iter().any(|port| !port.hostPort.is_none());
+                    if has_host_port {
+                        return true
+                    }
                 }
             }
         }
@@ -119,32 +129,6 @@ pub fn parse_manifests(manifests: &mut Vec<K8SManifest>) {
     println!("{}", format!("[*] Parsing done\n").green().bold());
 }
 
-pub fn parse_tosca(nodes: &mut Vec<NodeTemplate>) {
-    let path = Path::new(TOSCA_PATH);
-    let ref tosca_string = fs::read_to_string(path).unwrap();
-    let tosca_json = serde_yaml::from_str::<serde_json::Value>(&tosca_string).unwrap();
-
-    if let Some(topology_template) = tosca_json
-        .as_object()
-        .unwrap()
-        .get("topology_template") {
-
-        if let Some(node_templates) = topology_template
-            .as_object()
-            .unwrap()
-            .get("node_templates") {
-
-                for (key, value) in node_templates.as_object().unwrap() {
-                    let mut node_template: NodeTemplate = serde_json::from_value(value.clone()).unwrap();
-                    node_template.name = Some(key.to_string());
-                    nodes.push(node_template);
-                }
-
-            }
-    }
-
-}
-
 pub fn get_config() -> Config {
     let converted_config: Config = internal_read(CONFIG_PATH.to_owned());
 
@@ -184,7 +168,7 @@ pub fn create_pod_from(container: &Container) {
 
     let yaml = serde_yaml::to_string(&manifest).unwrap();
 
-    file.write_all(yaml.as_bytes());
+    file.write_all(yaml.as_bytes()).expect_err("Can't create pod file");
 }
 
 pub fn update_manifest(manifest: K8SManifest, filename: String) {

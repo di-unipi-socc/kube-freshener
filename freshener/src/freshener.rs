@@ -1,105 +1,70 @@
-use std::{collections::{HashMap, HashSet}};
+use std::{collections::HashMap};
 
 use colored::Colorize;
 
-use crate::{k8s_types::*, tosca_types::*, yaml_handler};
-
-const DATASTORE_TYPE: &str = "micro.nodes.Datastore";
+use crate::{k8s_types::*, yaml_handler};
 
 pub fn check_wobbly_interaction(
-    manifests: &Vec<K8SManifest>,
-    nodes: &Vec<NodeTemplate>
+    manifests: &Vec<K8SManifest>
 ) {
     let ref virtual_services = yaml_handler::get_virtual_services(manifests);
     let ref dest_rules = yaml_handler::get_destination_rules(manifests);
-    let mut node_set: HashSet<String> = HashSet::new();
+    let config = yaml_handler::get_config();
 
-    for node in nodes {
-        if let (Some(name), Some(kind)) = (&node.name, &node.kind) {
-            if kind != "micro.nodes.Datastore" && kind != "micro.nodes.MessageRouter" && kind != "micro.nodes.MessageBroker" {
-                node_set.insert(name.to_string());
-            }
-        }
-    }
-
-    for node in nodes {
-        if let Some(requirements) = &node.requirements {
-            for requirement in requirements {
-                let mut dest_node_name = String::new();
-
-                if let Some(interaction) = &requirement.interaction {
-                    match interaction {
-                        Interaction::String(val) => dest_node_name = val.to_string(),
-                        Interaction::DetailedInteraction(val) => {
-                            if let Some(detailed_node) = &val.node {
-                                dest_node_name = detailed_node.to_string();
-                            }
-                        }
-                    }
-                }
-                
-                // given the destination node I have to check if there is a virtual service
-                // having spec.hosts = dest_node_name or a destination rule having
-                // spec.host = dest_node_n
-                let has_virtual_service = virtual_services
+    for invoked_service in &config.invoked_services[..] {        
+        // given the destination node I have to check if there is a virtual service
+        // having spec.hosts = dest_node_name or a destination rule having
+        // spec.host = dest_node_n
+        let has_virtual_service = virtual_services
+            .into_iter()
+            .any(|m| {
+                if let Some(hosts) = &m.spec.hosts {
+                    return hosts
                     .into_iter()
-                    .any(|m| {
-                        if let Some(hosts) = &m.spec.hosts {
-                            return hosts
-                            .into_iter()
-                            .any(|h| *h == dest_node_name)
-                        }
-
-                        false
-                    });
-
-                let has_outlier_detection = dest_rules
-                    .into_iter()
-                    .any(|m| {
-                        if let (Some(host), Some(traffic_policy)) = (&m.spec.host, &m.spec.trafficPolicy) {
-                            return *host == dest_node_name && !traffic_policy.outlier_detection.is_none()
-                        }
-
-                        false
-                    });
-
-                if !has_virtual_service && !has_outlier_detection && node_set.contains(&dest_node_name) {
-                    println!(
-                        "{}{}\nService named {} is reached by \
-                        a service named {} without any circuit breaker or timeout: resolve the occurrence of wobbly \
-                        service interactions smells by adding circuit_breaker and/or and timeout in between .\n",
-                        format!("[Smell occurred - Wobbly Interaction]\n").red().bold(),
-                        format!("[Metadata name: {}]", dest_node_name).yellow().bold(),
-                        dest_node_name, 
-                        node.name.as_ref().unwrap()
-                    );
+                    .any(|h| &*h == invoked_service)
                 }
-            }
+
+                false
+            });
+
+        let has_outlier_detection = dest_rules
+            .into_iter()
+            .any(|m| {
+                if let (Some(host), Some(traffic_policy)) = (&m.spec.host, &m.spec.trafficPolicy) {
+                    return &*host == invoked_service && !traffic_policy.outlier_detection.is_none()
+                }
+
+                false
+            });
+
+        if !has_virtual_service && !has_outlier_detection {
+            println!(
+                "{}{}\nService named {} is reached by another service \
+                without any circuit breaker or timeout: resolve the occurrence of wobbly \
+                service interactions smells by adding circuit_breaker and/or and timeout in between .\n",
+                format!("[Smell occurred - Wobbly Interaction]\n").red().bold(),
+                format!("[Metadata name: {}]", invoked_service).yellow().bold(),
+                invoked_service
+            );
         }
     }
 }
 
 pub fn check_endpoint_based_interaction(
-    manifests: &Vec<K8SManifest>, 
-    nodes: &Vec<NodeTemplate> 
+    manifests: &Vec<K8SManifest>
 ) {
-    let mut node_hashmap: HashMap<String, K8sToscaNode> = HashMap::new();
+    let mut microservices_hashmap: HashMap<String, Microservice> = HashMap::new();
 
-    // iterate over nodes
-    // save nodes types
-    for node in nodes {
-        if let (Some(name), Some(kind)) = (&node.name, &node.kind) {
-            // println!("{} - {}", name, kind);
-            // I want to obtain deployment details to get a possible host port
-            let deployment = yaml_handler::get_deployment_named(name.to_string(), manifests);
-            if let Some(depl) = deployment {
-                let tosca_node = K8sToscaNode {
-                    kind: kind.to_string(),
-                    has_service: false,
-                    has_direct_access: yaml_handler::deployment_has_direct_access(depl)
-                };
-                node_hashmap.insert(name.to_string(), tosca_node);
-            }
+    let config = yaml_handler::get_config();
+
+    for invoked_service in &config.invoked_services[..] {
+        if let Some(deployment) = yaml_handler::get_deployment_named(invoked_service.clone(), manifests) {
+            let microservice = Microservice {
+                has_service: false,
+                has_direct_access: yaml_handler::deployment_has_direct_access(deployment)
+            };
+
+            microservices_hashmap.insert(invoked_service.clone(), microservice);
         }
     }
 
@@ -111,80 +76,48 @@ pub fn check_endpoint_based_interaction(
         if let Some(selector) = service.spec.selector {
             if let Some(name) = selector.service {
                 // if exists a service with the selector.app = tosca service name
-                if let Some(node) = node_hashmap.get(&name) {
+                if let Some(node) = microservices_hashmap.get(&name) {
                     // set the bool as true so that we can identify tosca services that have
                     // an attached k8s service
-                    let updated_tosca_node = K8sToscaNode {
-                        kind: node.kind.to_string(),
+                    let updated_microservice = Microservice {
                         has_service: true,
                         has_direct_access: node.has_direct_access
                     };
-                    node_hashmap.insert(name, updated_tosca_node);
+                    microservices_hashmap.insert(name, updated_microservice);
                 }
             }
         }
     }
 
-    // re-iterate over nodes
-    for node in nodes {
+    for invoked_service in &config.invoked_services[..] {
+        if let Some(dest_node) = microservices_hashmap.get(invoked_service) {
+            // We need to assure that the only way to access
+            // B is through k8s services, so we have to check that 
+            // the node.has_service is true and we also have to 
+            // check that the service named node_name has not in the manifest
+            // any hostPort or hostNetwork
+            if dest_node.has_direct_access {
+                // possible smell
+                println!(
+                    "{}Service named {} is an invoked service, \
+                    but it is direct reachable using a host port that you declared. \
+                    To solve this smell please remove any host network and host port\n",
+                    format!("[Smell occurred - Endpoint Based Interaction]\n").red().bold(),
+                    format!("{}", invoked_service).yellow().bold()
+                );
+            }
 
-        // iterate over interactions
-        // an interaction service is a destination service
-        if let Some(requirements) = &node.requirements {
-            for requirement in requirements {
-                let mut node_name = String::new();
-
-                if let Some(interaction) = &requirement.interaction {
-                    match interaction {
-                        Interaction::String(val) => node_name = val.to_string(),
-                        Interaction::DetailedInteraction(val) => {
-                            if let Some(detailed_node) = &val.node {
-                                node_name = detailed_node.to_string();
-                            }
-                        }
-                    }
-                }
-                
-                // if an interaction is in the hashmap, then insert 
-                // and verify that it is not a micro.nodes.Datastore node
-                if let Some(dest_node) = node_hashmap.get(&node_name.to_string()) {
-                    // Add to ignore list 
-                    if dest_node.kind != DATASTORE_TYPE {
-                        // now we know that this interaction is not
-                        // a Datastore object
-
-                        // next step: We need to ensure that the only way to access
-                        // B is through k8s services, so we have to check that 
-                        // the node.has_service is true and we also have to 
-                        // check that the service named node_name has not in the manifest
-                        // any hostPort or hostNetwork
-                        if dest_node.has_direct_access {
-                            // possible smell
-                            println!(
-                                "{}Service named {} is reached by \
-                                a service named {}, but it is direct reachable using a host port that you declared. \
-                                To solve this smell please remove any host network and host port\n",
-                                format!("[Smell occurred - Endpoint Based Interaction]\n").red().bold(),
-                                node_name, node.name.as_ref().unwrap()
-                            );
-                        }
-
-                        if !dest_node.has_service {
-                            // possible smell
-                            println!(
-                                "{}Service named {} is reached by \
-                                a service named {}, but there's no k8s service associated with it. \
-                                Therefore destination service could be reached with a hardcoded address. \
-                                To solve this smell please remove any host network and host port and use a k8s \
-                                service instead .\n",
-                                format!("[Smell occurred - Endpoint Based Interaction]\n").red().bold(),
-                                node_name, node.name.as_ref().unwrap()
-                            );
-                        }
-                    }
-                }
-                
-                
+            if !dest_node.has_service {
+                // possible smell
+                println!(
+                    "{}Service named {} is reached by another microservice, \
+                    but there's no k8s service associated with it. \
+                    Therefore destination service could be reached with a hardcoded address. \
+                    To solve this smell please remove any host network and host port and use a k8s \
+                    service instead .\n",
+                    format!("[Smell occurred - Endpoint Based Interaction]\n").red().bold(),
+                    format!("{}", invoked_service).yellow().bold()
+                );
             }
         }
     }
@@ -208,10 +141,8 @@ pub fn check_no_apigateway(manifests: &Vec<K8SManifest>) {
         }
         
         if let Some(template) = manifest.spec.template {
-            if let Some(spec) = template.spec {
-                if let Some(nested_containers) = spec.containers {
-                    analyze_containers_nag(manifest.metadata.name.clone(), &nested_containers, host_network);
-                }
+            if let Some(nested_containers) = template.spec.containers {
+                analyze_containers_nag(manifest.metadata.name.clone(), &nested_containers, host_network);
             }
         }
         
@@ -236,20 +167,18 @@ pub fn check_independent_depl(manifests: &Vec<K8SManifest>, solve: bool) {
              }
         } else {
             if let Some(template) = manifest.spec.template {
-                if let Some(spec) = template.spec {
-                    if let Some(mut nested_containers) = spec.containers {
-                        let refactored_containers = analyze_multiple_containers(&mut nested_containers, manifest.metadata.name, solve);
-                        let _spec = TemplateSpec {
-                            initContainers: spec.initContainers,
-                            containers: Some(refactored_containers),
-                            volumes: spec.volumes
-                        };
-                        let _template = Template {
-                            spec: Some(_spec)
-                        };
-                        manifest_cpy.spec.template = Some(_template);
-                        manifest_cpy.spec.containers = None;
-                    }
+                if let Some(mut nested_containers) = template.spec.containers {
+                    let refactored_containers = analyze_multiple_containers(&mut nested_containers, manifest.metadata.name, solve);
+                    let _spec = TemplateSpec {
+                        initContainers: template.spec.initContainers,
+                        containers: Some(refactored_containers),
+                        volumes: template.spec.volumes
+                    };
+                    let _template = Template {
+                        spec: _spec
+                    };
+                    manifest_cpy.spec.template = Some(_template);
+                    manifest_cpy.spec.containers = None;
                 }
             }
         }
@@ -268,8 +197,7 @@ pub fn check_independent_depl(manifests: &Vec<K8SManifest>, solve: bool) {
 /// it returns the refactored vector of containers
 fn analyze_multiple_containers(containers: &Vec<Container>, metadata_name: String, solve: bool) -> Vec<Container> {
     let mut main_container_name = String::new();
-    let mut result_containers: Vec<Container> = Vec::new();
-    result_containers = containers.clone();
+    let mut result_containers: Vec<Container> = containers.clone();
 
     // check config file
     let config = yaml_handler::get_config();
@@ -369,10 +297,14 @@ fn implements_message_routing(pod_name: String, image_name: String) -> bool {
         .noapigateway
         .iter()
         .find(|c| c.name == pod_name) {
-            if node_config_element.containers.is_none() { return false }
+            // return true because this is the case when you have 
+            // - name: catalogue, without containers
+            // this means that we have to ignore all containers inside the manifest
+            // called catalogue
+            if node_config_element.containers.is_none() { return true }
             return node_config_element.containers.as_ref().unwrap()
                 .iter()
-                .any(|c| *c == image_name) 
+                .any(|c| image_name.contains(&*c)) 
     }
 
     false
