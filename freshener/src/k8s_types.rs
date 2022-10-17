@@ -4,6 +4,7 @@ use serde::{Serialize, Deserialize};
 #[allow(non_snake_case)]
 pub struct Port {
     // pub containerPort: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub hostPort: Option<i32>,
 }
 
@@ -21,7 +22,9 @@ pub struct Limit {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Resources {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub limits: Option<Limit>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub requests: Option<Limit>
 }
 
@@ -34,10 +37,14 @@ pub struct Env {
 pub struct Container {
     pub name: String,
     pub image: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ports: Option<Vec<Port>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub resources: Option<Resources>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "imagePullPolicy")]
     pub image_pull_policy: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub env: Option<Vec<Env>>
 }
 
@@ -49,8 +56,11 @@ pub struct Volume {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[allow(non_snake_case)]
 pub struct TemplateSpec {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub initContainers: Option<Vec<Container>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub containers: Option<Vec<Container>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub volumes: Option<Vec<Volume>>,
 }
 
@@ -61,13 +71,16 @@ pub struct Template {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Selector {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub service: Option<String>
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OutlierDetection {
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "consecutive5xxErrors")]
     pub consecutive_errors: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub interval: Option<String>
 
 }
@@ -81,16 +94,27 @@ pub struct TrafficPolicy {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[allow(non_snake_case)]
 pub struct Spec {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub initContainers: Option<Vec<Container>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub containers: Option<Vec<Container>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub volumes: Option<Vec<Volume>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub template: Option<Template>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub hostNetwork: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub selector: Option<Selector>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub hosts: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub host: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub trafficPolicy: Option<TrafficPolicy>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub replicas: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub restartPolicy: Option<String>,
 }
 

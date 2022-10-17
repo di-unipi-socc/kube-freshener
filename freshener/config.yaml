@@ -9,6 +9,7 @@ smells:
     - search-engine
   endpoint_based_interaction:
   - frontend
+  - shipping
   wobbly:
   - frontend 
 invoked_services:

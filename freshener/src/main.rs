@@ -2,7 +2,6 @@ mod k8s_types;
 mod yaml_handler;
 mod freshener;
 mod cmd_handler;
-mod tosca_types;
 mod config_type;
 
 use std::env;
@@ -37,7 +36,7 @@ fn main() {
 
             freshener::check_independent_depl(&manifests, is_to_refactor);
             freshener::check_no_apigateway(&manifests, is_to_refactor);
-            freshener::check_endpoint_based_interaction(&manifests);
+            freshener::check_endpoint_based_interaction(&manifests, is_to_refactor);
             freshener::check_wobbly_interaction(&manifests);
         },
         _ =>  println!("Unrecognized command")

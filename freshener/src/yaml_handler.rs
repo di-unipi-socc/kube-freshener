@@ -145,7 +145,7 @@ pub fn create_pod_from(container: &Container) {
     path.push_str(".yaml");
     
     let mut file = File::create(path)
-        .expect("Error encountered while creating file!");
+        .expect("Error encountered while creating a new pod!");
 
     let manifest = K8SManifest {
         api_version: String::from("apps/v1"),
@@ -171,7 +171,41 @@ pub fn create_pod_from(container: &Container) {
     file.write_all(yaml.as_bytes());
 }
 
-pub fn update_manifest(manifest: K8SManifest, filename: String) {
+pub fn create_service_from(name: String) {
+    let mut path = String::from("./manifests/");
+    path.push_str(&name);
+    path.push_str("-srv");
+    path.push_str(".yaml");
+
+    let mut file = File::create(path)
+        .expect("Error encountered while creating a new service!");
+
+    let service_manifest = K8SManifest {
+        api_version: "v1".to_string(),
+        kind: "Service".to_string(),
+        metadata: Metadata { name: name.clone() },
+        spec: Spec { 
+            initContainers: None,
+            containers: None,
+            volumes: None,
+            template: None,
+            hostNetwork: None,
+            selector: Some(Selector {
+                service: Some(name),
+            }),
+            hosts: None,
+            host: None,
+            trafficPolicy: None,
+            replicas: None,
+            restartPolicy: None
+        }
+    };
+
+    let yaml = serde_yaml::to_string(&service_manifest).unwrap();
+    file.write_all(yaml.as_bytes());
+}
+
+pub fn update_manifest(manifest: &K8SManifest, filename: String) {
 
     for entry in WalkDir::new("./manifests")
         .follow_links(true)

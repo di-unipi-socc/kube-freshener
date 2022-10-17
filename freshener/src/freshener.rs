@@ -51,7 +51,8 @@ pub fn check_wobbly_interaction(
 }
 
 pub fn check_endpoint_based_interaction(
-    manifests: &Vec<K8SManifest>
+    manifests: &Vec<K8SManifest>,
+    is_to_refactor: bool
 ) {
     let mut microservices_hashmap: HashMap<String, Microservice> = HashMap::new();
 
@@ -70,26 +71,28 @@ pub fn check_endpoint_based_interaction(
 
     // iterate through k8s services and link them
     // to appropriate nodes in node_hashmap
-    let services = yaml_handler::get_services(manifests);
+    let services_manifests = yaml_handler::get_services(manifests);
+    let deployments_manifests = yaml_handler::get_deployments_pods(manifests);
 
-    for service in services {
-        if let Some(selector) = service.spec.selector {
-            if let Some(name) = selector.service {
+    for service_manifest in &services_manifests {
+        if let Some(selector) = &service_manifest.spec.selector {
+            if let Some(name) = &selector.service {
                 // if exists a service with the selector.app = tosca service name
-                if let Some(node) = microservices_hashmap.get(&name) {
+                if let Some(node) = microservices_hashmap.get(&*name) {
                     // set the bool as true so that we can identify tosca services that have
                     // an attached k8s service
                     let updated_microservice = Microservice {
                         has_service: true,
                         has_direct_access: node.has_direct_access
                     };
-                    microservices_hashmap.insert(name, updated_microservice);
+                    microservices_hashmap.insert(name.to_string(), updated_microservice);
                 }
             }
         }
     }
 
     for invoked_service in &config.invoked_services[..] {
+        if config.smells.endpoint_based_interaction.contains(invoked_service) { continue }
         if let Some(dest_node) = microservices_hashmap.get(invoked_service) {
             // We need to assure that the only way to access
             // B is through k8s services, so we have to check that 
@@ -101,10 +104,62 @@ pub fn check_endpoint_based_interaction(
                 println!(
                     "{}Service named {} is an invoked service, \
                     but it is direct reachable using a host port that you declared. \
-                    To solve this smell please remove any host network and host port\n",
+                    To solve this smell please remove every host network and host port\n",
                     format!("[Smell occurred - Endpoint Based Interaction]\n").red().bold(),
                     format!("{}", invoked_service).yellow().bold()
                 );
+
+                if is_to_refactor {
+                    if let Some(mut invoked_service_manifest) = deployments_manifests.clone()
+                    .into_iter()
+                    .find(|man| man.metadata.name == *invoked_service) {
+                        // * Removing every host network or host port
+
+                        invoked_service_manifest.spec.hostNetwork = None;
+
+                        // pod case
+                        if let Some(containers) = &invoked_service_manifest.spec.containers {
+                            let mut pod_refactored_containers: Vec<Container> = containers.clone();
+                            for container in containers { 
+                                let mut c = container.clone();
+                                let has_host_ports = !&container.ports.is_none() && container.ports.as_ref()
+                                    .unwrap()
+                                    .into_iter()
+                                    .any(|port| !port.hostPort.is_none());
+
+                                if has_host_ports { c.ports = None }
+                                pod_refactored_containers.push(c);
+                            }
+                            invoked_service_manifest.spec.containers = Some(pod_refactored_containers);
+                        }
+
+                        // deployment case
+                        if let Some(template) = &invoked_service_manifest.spec.template {
+                            if let Some(containers) = &template.spec.containers {
+                                let mut depl_refactored_containers: Vec<Container> = Vec::new();
+                                for container in containers {
+                                    let mut c = container.clone();
+                                    let has_host_ports = !&container.ports.is_none() && container.ports.as_ref()
+                                        .unwrap()
+                                        .into_iter()
+                                        .any(|port| !port.hostPort.is_none());
+
+                                    if has_host_ports { c.ports = None }
+                                    depl_refactored_containers.push(c);
+                                }
+                                let mut temp = template.clone();
+                                temp.spec.containers = Some(depl_refactored_containers);
+                                invoked_service_manifest.spec.template = Some(temp);
+                            }
+                        }
+                    
+                        let filename = format!("{}{}", invoked_service_manifest.metadata.name, ".yaml");
+                        
+                        yaml_handler::update_manifest(&invoked_service_manifest, filename);
+                        
+                    }
+                }
+                
             }
 
             if !dest_node.has_service {
@@ -113,17 +168,20 @@ pub fn check_endpoint_based_interaction(
                     "{}Service named {} is reached by another microservice, \
                     but there's no k8s service associated with it. \
                     Therefore destination service could be reached with a hardcoded address. \
-                    To solve this smell please remove any host network and host port and use a k8s \
+                    To solve this smell please remove every host network and host port and use a k8s \
                     service instead .\n",
                     format!("[Smell occurred - Endpoint Based Interaction]\n").red().bold(),
                     format!("{}", invoked_service).yellow().bold()
                 );
+
+                // TODO: - add a k8s service to this deployment
+                yaml_handler::create_service_from(invoked_service.to_string());
             }
         }
     }
 }
 
-pub fn check_no_apigateway(manifests: &Vec<K8SManifest>, solve: bool) {
+pub fn check_no_apigateway(manifests: &Vec<K8SManifest>, is_to_refactor: bool) {
     let deployment_manifest = yaml_handler::get_deployments_pods(manifests);
 
     for mut manifest in deployment_manifest {
@@ -136,23 +194,23 @@ pub fn check_no_apigateway(manifests: &Vec<K8SManifest>, solve: bool) {
         
         let host_network: bool = if let Some(hn) = &manifest.spec.hostNetwork { *hn } else { false };
 
-        if solve && host_network {
+        if is_to_refactor && host_network {
             manifest.spec.hostNetwork = None;
             let filename = format!("{}{}", manifest.metadata.name, ".yaml");
             // println!("{} has been modified with\n{:#?}", filename, man);
-            yaml_handler::update_manifest(manifest.clone(), filename); 
+            yaml_handler::update_manifest(&manifest, filename); 
         }
 
         // if manifest represents a pod
         if let Some(conts) = containers {
             let result = analyze_containers_nag(&manifest, &conts, host_network);
 
-            if result.1 && solve {
+            if result.1 && is_to_refactor {
                 let filename = format!("{}{}", manifest.metadata.name, ".yaml");
                 let mut manifest_cpy = manifest.clone();
                 manifest_cpy.spec.containers = Some(result.0);
                 // println!("{} has been modified with\n{:#?}", filename, man);
-                yaml_handler::update_manifest(manifest_cpy, filename); 
+                yaml_handler::update_manifest(&manifest_cpy, filename); 
             }
 
             return
@@ -163,7 +221,7 @@ pub fn check_no_apigateway(manifests: &Vec<K8SManifest>, solve: bool) {
             if let Some(nested_containers) = &template.spec.containers {
                 let result = analyze_containers_nag(&manifest, &nested_containers, host_network);
                 
-                if result.1 && solve {
+                if result.1 && is_to_refactor {
                     let filename = format!("{}{}", manifest.metadata.name, ".yaml");
                     let mut manifest_cpy = manifest.clone();
                     
@@ -179,7 +237,7 @@ pub fn check_no_apigateway(manifests: &Vec<K8SManifest>, solve: bool) {
                     }
                     
                     // println!("{} has been modified with\n{:#?}", filename, man);
-                    yaml_handler::update_manifest(manifest_cpy, filename); 
+                    yaml_handler::update_manifest(&manifest_cpy, filename); 
                 }
             }
         }
@@ -225,7 +283,7 @@ pub fn check_independent_depl(manifests: &Vec<K8SManifest>, is_to_refactor: bool
         // override the "manifest.metadata.name".yaml
         // with the refactored version
         if is_to_refactor {
-            yaml_handler::update_manifest(manifest_cpy, filename);
+            yaml_handler::update_manifest(&manifest_cpy, filename);
         }
 
     }
