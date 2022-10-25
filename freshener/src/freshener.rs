@@ -5,7 +5,8 @@ use colored::Colorize;
 use crate::{k8s_types::*, yaml_handler};
 
 pub fn check_wobbly_interaction(
-    manifests: &Vec<K8SManifest>
+    manifests: &Vec<K8SManifest>,
+    is_to_refactor: bool
 ) {
     let ref virtual_services = yaml_handler::get_virtual_services(manifests);
     let ref dest_rules = yaml_handler::get_destination_rules(manifests);
@@ -46,6 +47,10 @@ pub fn check_wobbly_interaction(
                 format!("[Metadata name: {}]", invoked_service).yellow().bold(),
                 invoked_service
             );
+
+            if is_to_refactor {
+                yaml_handler::create_virtual_service(invoked_service.clone());
+            }
         }
     }
 }

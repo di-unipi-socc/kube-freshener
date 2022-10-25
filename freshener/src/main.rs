@@ -37,7 +37,7 @@ fn main() {
             freshener::check_independent_depl(&manifests, is_to_refactor);
             freshener::check_no_apigateway(&manifests, is_to_refactor);
             freshener::check_endpoint_based_interaction(&manifests, is_to_refactor);
-            freshener::check_wobbly_interaction(&manifests);
+            freshener::check_wobbly_interaction(&manifests, is_to_refactor);
         },
         _ =>  println!("Unrecognized command")
     }

@@ -139,6 +139,42 @@ pub fn get_ignored_manifests() -> Vec<String> {
     get_config().ignored_manifests
 }
 
+pub fn create_virtual_service(depl_name: String) {
+    let mut path = String::from("./manifests/Istio/");
+    path.push_str(&depl_name);
+    path.push_str("-virtual-service.yaml");
+
+    let mut file = File::create(path)
+        .expect("Error encountered while creating a new destination rule!");
+
+    let vs = K8SManifest {
+        api_version: String::from("networking.istio.io/v1alpha3"),
+        kind: String::from("VirtualService"),
+        metadata: Metadata { name: depl_name.clone() },
+        spec: Spec { 
+            initContainers: None,
+            containers: None,
+            volumes: None,
+            template: None,
+            hostNetwork: None,
+            selector: None,
+            hosts: Some(vec![depl_name.clone()]),
+            host: None,
+            trafficPolicy: None,
+            replicas: None,
+            restartPolicy: None
+        }
+    };
+
+    let yaml = serde_yaml::to_string(&vs).unwrap();
+
+    let res = file.write_all(yaml.as_bytes());
+
+    if res.is_err() {
+        println!("Error while writing a new virtual service");
+    }
+}
+
 pub fn create_pod_from(container: &Container) {
     let mut path = String::from("./manifests/");
     path.push_str(&container.name);
@@ -168,7 +204,11 @@ pub fn create_pod_from(container: &Container) {
 
     let yaml = serde_yaml::to_string(&manifest).unwrap();
 
-    file.write_all(yaml.as_bytes());
+    let res = file.write_all(yaml.as_bytes());
+
+    if res.is_err() {
+        println!("Error while writing a new pod");
+    }
 }
 
 pub fn create_service_from(name: String) {
@@ -202,7 +242,12 @@ pub fn create_service_from(name: String) {
     };
 
     let yaml = serde_yaml::to_string(&service_manifest).unwrap();
-    file.write_all(yaml.as_bytes());
+    
+    let res = file.write_all(yaml.as_bytes());
+
+    if res.is_err() {
+        println!("Error raised while writing a new k8s service");
+    }
 }
 
 pub fn update_manifest(manifest: &K8SManifest, filename: String) {
