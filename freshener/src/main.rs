@@ -29,21 +29,29 @@ fn main() {
 
             println!("{}", format!("####### Parsing ########").bold());
 
-            startup(&mut manifests);
+            manifests = startup(true);
             println!("{}", format!("### Start Inspection ###").bold());
 
             let is_to_refactor = args.len() >= 3 && args[2].clone() == "-s";
 
             freshener::check_independent_depl(&manifests, is_to_refactor);
+
+            manifests = startup(false);
             freshener::check_no_apigateway(&manifests, is_to_refactor);
+
+            manifests = startup(false);
             freshener::check_endpoint_based_interaction(&manifests, is_to_refactor);
+
+            manifests = startup(false);
             freshener::check_wobbly_interaction(&manifests, is_to_refactor);
+
+            println!("{}", format!("### Inspection Ended ###").bold());
         },
         _ =>  println!("Unrecognized command")
     }
 
 }
 
-fn startup(manifests: &mut Vec<K8SManifest>) {
-    yaml_handler::parse_manifests(manifests);
+fn startup(log: bool) -> Vec<K8SManifest> {
+    return yaml_handler::parse_manifests(log);
 }

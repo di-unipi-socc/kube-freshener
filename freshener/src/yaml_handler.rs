@@ -1,6 +1,7 @@
 use crate::{k8s_types::*, yaml_handler};
 use crate::{config_type::*};
 use std::fs::File;
+use std::vec;
 use std::{fs, io::Write};
 use walkdir::WalkDir;
 use colored::Colorize;
@@ -97,7 +98,8 @@ pub fn get_deployments_pods(manifests: &Vec<K8SManifest>) -> Vec<K8SManifest> {
 }
 
 /// It read recursively all the k8s manifests inside the 'manifests' folder
-pub fn parse_manifests(manifests: &mut Vec<K8SManifest>) {
+pub fn parse_manifests(log: bool) -> Vec<K8SManifest> {
+    let mut manifests: Vec<K8SManifest> = vec![];
     for entry in WalkDir::new("./manifests")
         .follow_links(true)
         .into_iter()
@@ -108,7 +110,7 @@ pub fn parse_manifests(manifests: &mut Vec<K8SManifest>) {
 
         // Discard all manifests delcared in ignore-list.yaml
         if filename.ends_with(".yaml") && !get_ignored_manifests().contains(&f) {
-            println!("[*] Parsing {}", filename);
+            if log { println!("[*] Parsing {}", filename); }
             let path = entry.path();
             let ref manifest_string = fs::read_to_string(path).expect(&filename.to_string());
 
@@ -118,6 +120,41 @@ pub fn parse_manifests(manifests: &mut Vec<K8SManifest>) {
             */
             let ref sub_manifests = yaml_handler::unpack(manifest_string);
 
+            if sub_manifests.len() > 1 {
+                // delete the manifest
+                fs::remove_file(path)
+                    .expect("Cannot delete redundant manifest");
+
+                for man in sub_manifests {
+                    let mut man_path = String::from(path.to_str().unwrap());
+                    
+                    let components = path.to_str().unwrap().split("/");
+                    let last_component = components.last().unwrap();
+
+                    man_path = remove_suffix(&man_path, last_component).to_string();
+
+                    // ? converting man so that we can retrieve the deployment name
+                    let converted_man: K8SManifest = serde_yaml::from_str(&man).unwrap();   
+                    let man_name = converted_man.metadata.name;
+                    let man_kind = converted_man.kind;
+
+                    man_path.push_str(&man_name);
+                    man_path.push_str("-");
+                    man_path.push_str(&man_kind);
+                    man_path.push_str(".yaml");
+
+                    let mut file = File::create(man_path)
+                        .expect("Error encountered while unpacking manifest!");
+                    
+                    let res = file.write_all(man.as_bytes());
+
+                    if res.is_err() {
+                        println!("Error while writing a new pod");
+                    }
+
+                }
+            }
+
             // deserializing manifests
             for m in sub_manifests {
                 let converted_manifest: K8SManifest = serde_yaml::from_str(&m).unwrap();
@@ -126,7 +163,16 @@ pub fn parse_manifests(manifests: &mut Vec<K8SManifest>) {
         }
     } 
 
-    println!("{}", format!("[*] Parsing done\n").green().bold());
+    if log { println!("{}", format!("[*] Parsing done\n").green().bold()); }
+    manifests
+}
+
+fn remove_suffix<'a>(s: &'a str, p: &str) -> &'a str {
+    if s.ends_with(p) {
+        &s[..s.len() - p.len()]
+    } else {
+        s
+    }
 }
 
 pub fn get_config() -> Config {
@@ -150,7 +196,7 @@ pub fn create_virtual_service(depl_name: String) {
     let vs = K8SManifest {
         api_version: String::from("networking.istio.io/v1alpha3"),
         kind: String::from("VirtualService"),
-        metadata: Metadata { name: depl_name.clone() },
+        metadata: Metadata { name: depl_name.clone(), labels: None },
         spec: Spec { 
             initContainers: None,
             containers: None,
@@ -162,7 +208,10 @@ pub fn create_virtual_service(depl_name: String) {
             host: None,
             trafficPolicy: None,
             replicas: None,
-            restartPolicy: None
+            restartPolicy: None,
+            service_account_name: None,
+            termination_grace_period_seconds: None,
+            security_context: None,
         }
     };
 
@@ -186,7 +235,7 @@ pub fn create_pod_from(container: &Container) {
     let manifest = K8SManifest {
         api_version: String::from("apps/v1"),
         kind: String::from("Pod"),
-        metadata: Metadata { name: container.name.clone() },
+        metadata: Metadata { name: container.name.clone(), labels: None },
         spec: Spec { 
             initContainers: None,
             containers: Some(vec![container.clone()]),
@@ -198,7 +247,10 @@ pub fn create_pod_from(container: &Container) {
             host: None,
             trafficPolicy: None,
             replicas: None,
-            restartPolicy: None
+            restartPolicy: None,
+            service_account_name: None,
+            termination_grace_period_seconds: None,
+            security_context: None,
         }
     };
 
@@ -223,7 +275,7 @@ pub fn create_service_from(name: String) {
     let service_manifest = K8SManifest {
         api_version: "v1".to_string(),
         kind: "Service".to_string(),
-        metadata: Metadata { name: name.clone() },
+        metadata: Metadata { name: name.clone(), labels: None },
         spec: Spec { 
             initContainers: None,
             containers: None,
@@ -232,12 +284,16 @@ pub fn create_service_from(name: String) {
             hostNetwork: None,
             selector: Some(Selector {
                 service: Some(name),
+                match_labels: None,
             }),
             hosts: None,
             host: None,
             trafficPolicy: None,
             replicas: None,
-            restartPolicy: None
+            restartPolicy: None,
+            service_account_name: None,
+            termination_grace_period_seconds: None,
+            security_context: None,
         }
     };
 
@@ -295,7 +351,7 @@ fn unpack(manifest: &String) -> Vec<String> {
         as a separator
     */
     let split = manifest.split("---");
-    let vec = split.map(|x| x.to_owned()).collect();
+    let vec = split.map(|x| x.to_owned()).collect();    
 
     vec
 }

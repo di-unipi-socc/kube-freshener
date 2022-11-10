@@ -40,12 +40,13 @@ pub fn check_wobbly_interaction(
 
         if !has_virtual_service && !has_outlier_detection {
             println!(
-                "{}{}\nService named {} is reached by another service \
-                without any circuit breaker or timeout: resolve the occurrence of wobbly \
-                service interactions smells by adding circuit_breaker and/or and timeout in between .\n",
-                format!("[Smell occurred - Wobbly Interaction]\n").red().bold(),
-                format!("[Metadata name: {}]", invoked_service).yellow().bold(),
-                invoked_service
+                "{}{}\nService named {} is reached by another service
+                \nwithout any circuit breaker or timeout.
+                {} solve it by adding circuit_breaker and/or and timeout in between .\n",
+                format!("⚠️[Smell occurred - Wobbly Interaction]\n").red().bold(),
+                format!("[Metadata name: {}]", invoked_service).cyan().bold(),
+                invoked_service,
+                format!("\nHint:").yellow().italic(),
             );
 
             if is_to_refactor {
@@ -64,40 +65,55 @@ pub fn check_endpoint_based_interaction(
     let config = yaml_handler::get_config();
 
     for invoked_service in &config.invoked_services[..] {
-        if let Some(deployment) = yaml_handler::get_deployment_named(invoked_service.clone(), manifests) {
+        if let Some(deployment) = yaml_handler::
+            get_deployment_named(
+                invoked_service.clone(),
+                manifests
+        ) {
+
             let microservice = Microservice {
                 has_service: false,
-                has_direct_access: yaml_handler::deployment_has_direct_access(deployment)
+                has_direct_access: yaml_handler::
+                    deployment_has_direct_access(deployment)
             };
 
-            microservices_hashmap.insert(invoked_service.clone(), microservice);
+            microservices_hashmap.insert(
+                invoked_service.clone(),
+                microservice
+            );
         }
     }
 
     // iterate through k8s services and link them
     // to appropriate nodes in node_hashmap
-    let services_manifests = yaml_handler::get_services(manifests);
-    let deployments_manifests = yaml_handler::get_deployments_pods(manifests);
+    let services_manifests = yaml_handler::
+        get_services(manifests);
+    let deployments_manifests = yaml_handler::
+        get_deployments_pods(manifests);
 
     for service_manifest in &services_manifests {
         if let Some(selector) = &service_manifest.spec.selector {
             if let Some(name) = &selector.service {
                 // if exists a service with the selector.app = tosca service name
-                if let Some(node) = microservices_hashmap.get(&*name) {
+                if let Some(node) = microservices_hashmap
+                    .get(&*name) {
                     // set the bool as true so that we can identify tosca services that have
                     // an attached k8s service
                     let updated_microservice = Microservice {
                         has_service: true,
                         has_direct_access: node.has_direct_access
                     };
-                    microservices_hashmap.insert(name.to_string(), updated_microservice);
+                    microservices_hashmap.insert(
+                        name.to_string(),
+                        updated_microservice
+                    );
                 }
             }
         }
     }
 
     for invoked_service in &config.invoked_services[..] {
-        if config.smells.endpoint_based_interaction.contains(invoked_service) { continue }
+        if config.ignore_smells.endpoint_based_interaction.contains(invoked_service) { continue }
         if let Some(dest_node) = microservices_hashmap.get(invoked_service) {
             // We need to assure that the only way to access
             // B is through k8s services, so we have to check that 
@@ -107,11 +123,12 @@ pub fn check_endpoint_based_interaction(
             if dest_node.has_direct_access {
                 // possible smell
                 println!(
-                    "{}Service named {} is an invoked service, \
-                    but it is direct reachable using a host port that you declared. \
-                    To solve this smell please remove every host network and host port\n",
+                    "{}Service named {} is an invoked service,
+                    \nbut it is reachable directly by using a host port you declared.
+                    {} remove every host network and host port\n",
                     format!("[Smell occurred - Endpoint Based Interaction]\n").red().bold(),
-                    format!("{}", invoked_service).yellow().bold()
+                    format!("{}", invoked_service).yellow().bold(),
+                    format!("\nHint:").yellow().italic()
                 );
 
                 if is_to_refactor {
@@ -150,6 +167,7 @@ pub fn check_endpoint_based_interaction(
                                         .any(|port| !port.hostPort.is_none());
 
                                     if has_host_ports { c.ports = None }
+                                    // println!("Pushing container: {:#?}", c);
                                     depl_refactored_containers.push(c);
                                 }
                                 let mut temp = template.clone();
@@ -170,17 +188,18 @@ pub fn check_endpoint_based_interaction(
             if !dest_node.has_service {
                 // possible smell
                 println!(
-                    "{}Service named {} is reached by another microservice, \
-                    but there's no k8s service associated with it. \
-                    Therefore destination service could be reached with a hardcoded address. \
-                    To solve this smell please remove every host network and host port and use a k8s \
+                    "{}Service named {} is reached by another microservice,
+                    \nbut there's no k8s service associated with it.
+                    {} remove every host network and host port and use a k8s \
                     service instead .\n",
-                    format!("[Smell occurred - Endpoint Based Interaction]\n").red().bold(),
-                    format!("{}", invoked_service).yellow().bold()
+                    format!("⚠️[Endpoint Based Interaction]\n").red().bold(),
+                    format!("{}", invoked_service).yellow().bold(),
+                    format!("\nHint:").yellow().italic(),
                 );
 
-                // TODO: - add a k8s service to this deployment
-                yaml_handler::create_service_from(invoked_service.to_string());
+                if is_to_refactor {
+                    yaml_handler::create_service_from(invoked_service.to_string());
+                }
             }
         }
     }
@@ -236,7 +255,8 @@ pub fn check_no_apigateway(manifests: &Vec<K8SManifest>, is_to_refactor: bool) {
                             containers: Some(result.0),
                             volumes: template.spec.volumes
                         };
-                        let _template = Template { spec: _templae_spec };
+
+                        let _template = Template { spec: _templae_spec, metadata: template.metadata };
                         manifest_cpy.spec.template = Some(_template);
                         manifest_cpy.spec.containers = None;
                     }
@@ -254,7 +274,7 @@ pub fn check_independent_depl(manifests: &Vec<K8SManifest>, is_to_refactor: bool
     let deployment_manifests = yaml_handler::get_deployments_pods(manifests);
 
     for manifest in deployment_manifests {
-        if manifest.metadata.name != "catalogue" { continue; }
+
         let mut manifest_cpy = manifest.clone();
         let filename = format!("{}{}", manifest.metadata.name, ".yaml");
         let containers = &manifest.spec.containers;
@@ -265,18 +285,21 @@ pub fn check_independent_depl(manifests: &Vec<K8SManifest>, is_to_refactor: bool
                 let refactored_containers = analyze_multiple_containers(&mut containers, manifest.metadata.name.clone(), is_to_refactor);
                 manifest_cpy.spec.containers = Some(refactored_containers);
              }
-        } else {
+        } else if manifest.kind == "Deployment" {
             if let Some(template) = manifest.spec.template {
                 if let Some(mut nested_containers) = template.spec.containers {
-                    let refactored_containers = analyze_multiple_containers(&mut nested_containers, manifest.metadata.name, is_to_refactor);
+                    let refactored_containers = analyze_multiple_containers(&mut nested_containers, manifest.metadata.name.clone(), is_to_refactor);
+                    
                     let _spec = TemplateSpec {
                         initContainers: template.spec.initContainers,
                         containers: Some(refactored_containers),
                         volumes: template.spec.volumes
                     };
                     let _template = Template {
-                        spec: _spec
+                        spec: _spec,
+                        metadata: template.metadata
                     };
+
                     manifest_cpy.spec.template = Some(_template);
                     manifest_cpy.spec.containers = None;
                 }
@@ -303,18 +326,28 @@ fn analyze_multiple_containers(containers: &Vec<Container>, metadata_name: Strin
     let config = yaml_handler::get_config();
 
     for container in containers {
-        let node_config_element = config.smells.multiple_container.iter().find(|c| c.name == metadata_name);
+        let node_config_element = config.ignore_smells
+            .multiple_container
+            .iter()
+            .find(
+                |c| c.name == metadata_name
+            );
+
         let has_pattern = get_patterns().iter()
             .any(|pattern| -> bool {
-                container.name.contains(pattern) || container.image.contains(pattern)
+                container.name.contains(pattern) 
+                || container.image.contains(pattern)
             });
     
         let mut has_known_sidecar: bool = false;
         
         if let Some(node_element) = node_config_element {
-            if node_element.containers.is_none() { has_known_sidecar = false }
-            else {
-                has_known_sidecar = node_element.containers.as_ref().unwrap()
+            if node_element.containers.is_none() { 
+                has_known_sidecar = false 
+            } else {
+                has_known_sidecar = node_element.containers
+                .as_ref()
+                .unwrap()
                 .iter()
                 .any(|c| *c == container.name);
             }
@@ -324,9 +357,8 @@ fn analyze_multiple_containers(containers: &Vec<Container>, metadata_name: Strin
             if !main_container_name.is_empty() {
                 println!(
                     "{}{}\nContainer named {} may not be a sidecar, \
-                    because it has {} as an image,\nso we cannot ensure that this container is a proper sidecar. \
-                    Therefore it can potentially violate the Independent Deployability rule\n",
-                    format!("[Smell occurred - Multiple containers per Deployment]\n").red().bold(),
+                    we cannot assure {} is a proper sidecar.\n",
+                    format!("⚠️[Multiple containers per Deployment]\n").red().bold(),
                     format!("[Metadata name: {}]", metadata_name).yellow().bold(),
                     container.name, container.image
                 );
@@ -358,30 +390,36 @@ fn analyze_containers_nag(manifest: &K8SManifest, containers: &Vec<Container>, h
 
     for container in containers {
         let mut c = container.clone();
-        if host_network && !implements_message_routing(manifest.metadata.name.clone(), container.image.clone()) {
+        if host_network && !implements_message_routing(
+            manifest.metadata.name.clone(),
+            container.image.clone()
+        ) {
             println!(
                 "{}{}\nHostNetwork is set to true and container's (named '{}'), \
-                image '{}' may not be a proper message routing implementation and \
-                this could be a potential no api gateway smell.\n",
-                format!("[Smell occurred - No API Gateway]\n").red().bold(),
+                image '{}' may not implement message routing.\n",
+                format!("⚠️[No API Gateway]\n").red().bold(),
                 format!("[Metadata name: {}]", &manifest.metadata.name).yellow().bold(),
                 container.name, 
                 container.image
-            );
+            )
         }
 
         if let Some(ports) = &container.ports {
             // check if the current container has at least one host port
-            let has_host_port = ports.into_iter().any(|port| !port.hostPort.is_none());
+            let has_host_port = ports
+                .into_iter()
+                .any(|port| !port.hostPort.is_none());
 
             // if it's true, then we have to verify that the current container is running
             // an official Docker image that implements message routing
-            if has_host_port && !implements_message_routing(manifest.metadata.name.clone(), container.image.clone()) {
+            if has_host_port && !implements_message_routing(
+                manifest.metadata.name.clone(),
+                container.image.clone()
+            ) {
                 println!(
                     "{}{}\nContainer named '{}' has an hostPort associated, \
-                    the container's image '{}' may not be a proper message routing implementation and \
-                    this could be a potential no api gateway smell.\n",
-                    format!("[Smell occurred - No API Gateway]\n").red().bold(),
+                    and its image '{}' may not implement message routing.\n",
+                    format!("⚠️[No API Gateway]\n").red().bold(),
                     format!("[Metadata name: {}]", &manifest.metadata.name).yellow().bold(),
                     container.name,
                     container.image,
@@ -400,18 +438,29 @@ fn analyze_containers_nag(manifest: &K8SManifest, containers: &Vec<Container>, h
 
 }
 
-fn implements_message_routing(pod_name: String, image_name: String) -> bool {
-    if let Some(node_config_element) = yaml_handler::get_config()
-        .smells
+fn implements_message_routing(
+    pod_name: String,
+    image_name: String
+) -> bool {
+    if let Some(node_config_element) = yaml_handler
+        ::get_config()
+        .ignore_smells
         .noapigateway
         .iter()
         .find(|c| c.name == pod_name) {
-            // return true because this is the case when you have 
-            // - name: catalogue, without containers
-            // this means that we have to ignore all containers inside the manifest
-            // called catalogue
-            if node_config_element.containers.is_none() { return true }
-            return node_config_element.containers.as_ref().unwrap()
+            //ritorna vero nei casi in cui nel 
+            // config si ha - name: catalogue
+            // senza che vengano specificati 
+            // container; questo significa che 
+            // dobbiamo ignorare tutti i container
+            // dentro catalogue
+            if node_config_element.containers.is_none() {
+                return true 
+            }
+            return node_config_element
+                .containers
+                .as_ref()
+                .unwrap()
                 .iter()
                 .any(|c| image_name.contains(&*c)) 
     }

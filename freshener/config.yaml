@@ -1,4 +1,4 @@
-smells:
+ignore_smells:
   multiple_container:
   - name: catalogue
     containers:

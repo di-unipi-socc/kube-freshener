@@ -16,7 +16,7 @@ pub struct Smells {
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
-    pub smells: Smells,
+    pub ignore_smells: Smells,
     pub invoked_services: Vec<String>,
     pub ignored_manifests: Vec<String>
 }
