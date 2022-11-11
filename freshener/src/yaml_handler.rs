@@ -283,8 +283,9 @@ pub fn create_service_from(name: String) {
             template: None,
             hostNetwork: None,
             selector: Some(Selector {
-                service: Some(name),
+                service: None,
                 match_labels: None,
+                app: Some(name)
             }),
             hosts: None,
             host: None,

@@ -92,9 +92,11 @@ pub fn check_endpoint_based_interaction(
         get_deployments_pods(manifests);
 
     for service_manifest in &services_manifests {
+        println!("watching service: {}", service_manifest.metadata.name);
         if let Some(selector) = &service_manifest.spec.selector {
-            if let Some(name) = &selector.service {
+            if let Some(name) = &selector.app {
                 // if exists a service with the selector.app = tosca service name
+                
                 if let Some(node) = microservices_hashmap
                     .get(&*name) {
                     // set the bool as true so that we can identify tosca services that have

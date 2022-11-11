@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongo-orders
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongo-orders
+  template:
+    metadata:
+      labels:
+        app: mongo-orders
+    spec:
+      containers:
+        - name: mamarino/mongo-orders
+          image: mongo
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo-orders-srv
+spec:
+  selector:
+    app: mongo-orders
+  ports:
+    - name: db
+      protocol: TCP
+      port: 27017
+      targetPort: 27017

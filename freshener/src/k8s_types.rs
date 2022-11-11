@@ -110,7 +110,9 @@ pub struct Selector {
     pub service: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "matchLabels")]
-    pub match_labels: Option<Labels>
+    pub match_labels: Option<Labels>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub app: Option<String>
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
