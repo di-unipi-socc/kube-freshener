@@ -30,23 +30,3 @@ spec:
             cpu: 100m
             memory: 256Mi
       restartPolicy: Always
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: rabbitmq-srv
-  labels:
-    service: rabbitmq
-spec:
-  ports:
-  - name: tcp-amqp
-    port: 5672
-    targetPort: 5672
-  - name: http-management
-    port: 15672
-    targetPort: 15672
-  - name: tcp-epmd
-    port: 4369
-    targetPort: 4369
-  selector:
-    service: rabbitmq

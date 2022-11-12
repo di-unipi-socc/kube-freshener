@@ -1,4 +1,4 @@
-use std::{collections::HashMap};
+use std::{collections::HashMap, borrow::Borrow};
 
 use colored::Colorize;
 
@@ -40,12 +40,11 @@ pub fn check_wobbly_interaction(
 
         if !has_virtual_service && !has_outlier_detection {
             println!(
-                "{}{}\nService named {} is reached by another service
-                \nwithout any circuit breaker or timeout.
+                "{}\n(*) Service named {} is reached by another service \n\
+                without any circuit breaker or timeout. \n\
                 {} solve it by adding circuit_breaker and/or and timeout in between .\n",
-                format!("⚠️[Smell occurred - Wobbly Interaction]\n").red().bold(),
-                format!("[Metadata name: {}]", invoked_service).cyan().bold(),
-                invoked_service,
+                format!("! [Wobbly Interaction]").red().bold(),
+                format!("{}", invoked_service).cyan().bold(),
                 format!("\nHint:").yellow().italic(),
             );
 
@@ -92,9 +91,19 @@ pub fn check_endpoint_based_interaction(
         get_deployments_pods(manifests);
 
     for service_manifest in &services_manifests {
-        println!("watching service: {}", service_manifest.metadata.name);
         if let Some(selector) = &service_manifest.spec.selector {
-            if let Some(name) = &selector.app {
+
+            let app_name = selector.app.clone();
+            let service_name = selector.service.clone();
+            let mut name = String::from("");
+
+            if !app_name.is_none() {
+                name = app_name.unwrap();
+            } else if !service_name.is_none() {
+                name = service_name.unwrap();
+            }
+
+            if !name.is_empty() { 
                 // if exists a service with the selector.app = tosca service name
                 
                 if let Some(node) = microservices_hashmap
@@ -125,11 +134,11 @@ pub fn check_endpoint_based_interaction(
             if dest_node.has_direct_access {
                 // possible smell
                 println!(
-                    "{}Service named {} is an invoked service,
-                    \nbut it is reachable directly by using a host port you declared.
-                    {} remove every host network and host port\n",
-                    format!("[Smell occurred - Endpoint Based Interaction]\n").red().bold(),
-                    format!("{}", invoked_service).yellow().bold(),
+                    "{}(*) Service named {} is an invoked service, \n\
+                    but it is reachable directly by using a host port \n\
+                    you declared. {} remove every host network and host port\n",
+                    format!("! [Endpoint Based Interaction]\n").red().bold(),
+                    format!("{}", invoked_service).cyan().bold(),
                     format!("\nHint:").yellow().italic()
                 );
 
@@ -190,12 +199,12 @@ pub fn check_endpoint_based_interaction(
             if !dest_node.has_service {
                 // possible smell
                 println!(
-                    "{}Service named {} is reached by another microservice,
-                    \nbut there's no k8s service associated with it.
-                    {} remove every host network and host port and use a k8s \
-                    service instead .\n",
-                    format!("⚠️[Endpoint Based Interaction]\n").red().bold(),
-                    format!("{}", invoked_service).yellow().bold(),
+                    "{}(*) Service named {} is reached by another microservice,\n\
+                    but there's no k8s service associated with it.\n\
+                    {} remove every host network and host port and use a k8s \n\
+                    service instead.\n",
+                    format!("! [Endpoint Based Interaction]\n").red().bold(),
+                    format!("{}", invoked_service).cyan().bold(),
                     format!("\nHint:").yellow().italic(),
                 );
 
@@ -235,6 +244,11 @@ pub fn check_no_apigateway(manifests: &Vec<K8SManifest>, is_to_refactor: bool) {
                 let filename = format!("{}{}", manifest.metadata.name, ".yaml");
                 let mut manifest_cpy = manifest.clone();
                 manifest_cpy.spec.containers = Some(result.0);
+                
+                if result.2 {
+                    manifest_cpy.spec.hostNetwork = None;
+                }
+                
                 // println!("{} has been modified with\n{:#?}", filename, man);
                 yaml_handler::update_manifest(&manifest_cpy, filename); 
             }
@@ -246,10 +260,14 @@ pub fn check_no_apigateway(manifests: &Vec<K8SManifest>, is_to_refactor: bool) {
         if let Some(template) = &manifest.spec.template {
             if let Some(nested_containers) = &template.spec.containers {
                 let result = analyze_containers_nag(&manifest, &nested_containers, host_network);
-                
+
                 if result.1 && is_to_refactor {
-                    let filename = format!("{}{}", manifest.metadata.name, ".yaml");
+                    let filename = format!("{}-Deployment{}", manifest.metadata.name, ".yaml");
                     let mut manifest_cpy = manifest.clone();
+
+                    if result.2 {
+                        manifest_cpy.spec.hostNetwork = Some(false);
+                    }
                     
                     if let Some(template) = manifest.spec.template {
                         let _templae_spec = TemplateSpec {
@@ -263,6 +281,8 @@ pub fn check_no_apigateway(manifests: &Vec<K8SManifest>, is_to_refactor: bool) {
                         manifest_cpy.spec.containers = None;
                     }
                     
+                    println!("UPDATING MANIFEST IN {} WITH:\n{:#?}", filename, manifest_cpy);
+
                     // println!("{} has been modified with\n{:#?}", filename, man);
                     yaml_handler::update_manifest(&manifest_cpy, filename); 
                 }
@@ -358,11 +378,12 @@ fn analyze_multiple_containers(containers: &Vec<Container>, metadata_name: Strin
         if !(has_pattern || has_known_sidecar) {
             if !main_container_name.is_empty() {
                 println!(
-                    "{}{}\nContainer named {} may not be a sidecar, \
+                    "{}{}\n(*) Container named {} may not be a sidecar, \n\
                     we cannot assure {} is a proper sidecar.\n",
-                    format!("⚠️[Multiple containers per Deployment]\n").red().bold(),
-                    format!("[Metadata name: {}]", metadata_name).yellow().bold(),
-                    container.name, container.image
+                    format!("! [Multiple containers per Deployment] => ").red().bold(),
+                    format!("in {}", metadata_name).yellow().bold(),
+                    format!("{}", container.name).cyan().bold(),
+                    format!("{}", container.image).bright_purple().bold(),
                 );
 
                 // solving by creating a new pod named as the "wrong" container name
@@ -386,9 +407,10 @@ fn analyze_multiple_containers(containers: &Vec<Container>, metadata_name: Strin
     result_containers
 }
 
-fn analyze_containers_nag(manifest: &K8SManifest, containers: &Vec<Container>, host_network: bool) -> (Vec<Container>, bool) {
+fn analyze_containers_nag(manifest: &K8SManifest, containers: &Vec<Container>, host_network: bool) -> (Vec<Container>, bool, bool) {
     let mut result_containers: Vec<Container> = Vec::new();
     let mut has_to_update = false;
+    let mut remove_host_network = false;
 
     for container in containers {
         let mut c = container.clone();
@@ -397,13 +419,16 @@ fn analyze_containers_nag(manifest: &K8SManifest, containers: &Vec<Container>, h
             container.image.clone()
         ) {
             println!(
-                "{}{}\nHostNetwork is set to true and container's (named '{}'), \
+                "{}{}\n(*) HostNetwork is set to true and container's (named '{}'), \n\
                 image '{}' may not implement message routing.\n",
-                format!("⚠️[No API Gateway]\n").red().bold(),
-                format!("[Metadata name: {}]", &manifest.metadata.name).yellow().bold(),
-                container.name, 
-                container.image
-            )
+                format!("! [No API Gateway] => ").red().bold(),
+                format!("in {}", &manifest.metadata.name).yellow().bold(),
+                format!("{}", container.name).cyan().bold(), 
+                format!("{}", container.image).bright_purple().bold(),
+            );
+
+            has_to_update = true;
+            remove_host_network = true;
         }
 
         if let Some(ports) = &container.ports {
@@ -419,12 +444,12 @@ fn analyze_containers_nag(manifest: &K8SManifest, containers: &Vec<Container>, h
                 container.image.clone()
             ) {
                 println!(
-                    "{}{}\nContainer named '{}' has an hostPort associated, \
+                    "{}{}\n(*) Container named '{}' has an hostPort associated, \n\
                     and its image '{}' may not implement message routing.\n",
-                    format!("⚠️[No API Gateway]\n").red().bold(),
-                    format!("[Metadata name: {}]", &manifest.metadata.name).yellow().bold(),
-                    container.name,
-                    container.image,
+                    format!("! [No API Gateway] => ").red().bold(),
+                    format!("in {}", &manifest.metadata.name).yellow().bold(),
+                    format!("{}", container.name).cyan().bold(),
+                    format!("{}", container.image).bright_purple().bold(),
                 );
 
                 c.ports = None;
@@ -436,7 +461,7 @@ fn analyze_containers_nag(manifest: &K8SManifest, containers: &Vec<Container>, h
         result_containers.push(c);
     }
 
-    (result_containers, has_to_update)
+    (result_containers, has_to_update, remove_host_network)
 
 }
 

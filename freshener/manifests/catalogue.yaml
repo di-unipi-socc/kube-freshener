@@ -5,32 +5,18 @@ metadata:
   labels:
     service: catalogue
 spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      service: catalogue
   template:
-    metadata:
-      labels:
-        service: catalogue
     spec:
-      serviceAccountName: robot-shop
       containers:
       - name: catalogue
         image: robotshop/rs-catalogue:latest
         imagePullPolicy: IfNotPresent
         env:
-          - name: INSTANA_AGENT_HOST
-            valueFrom:
-              fieldRef:
-                fieldPath: status.hostIP
+        - name: INSTANA_AGENT_HOST
       - name: dynatrace
         image: dynatrace/oneagent
       - name: search-engine
         image: mamarino/search-engine:latest
-        ports:
-        - containerPort: 8080
-        - hostPort: 4000
         resources:
           limits:
             cpu: 200m
@@ -38,4 +24,10 @@ spec:
           requests:
             cpu: 100m
             memory: 50Mi
-      restartPolicy: Always
+    metadata:
+      labels:
+        service: catalogue
+  selector:
+    matchLabels:
+      service: catalogue
+  replicas: 1

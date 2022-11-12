@@ -5,13 +5,15 @@ metadata:
 spec:
   selector:
     matchLabels:
-      app: name: mysql-users
+      app: mysql-users
+      name: mysql-users
   strategy:
     type: Recreate
   template:
     metadata:
       labels:
-        app: name: mysql-users
+        app: mysql-users
+        name: mysql-users
     spec:
       containers:
       - image: mamarino/mysql-users:latest
@@ -32,13 +34,3 @@ spec:
       - name: mysql-persistent-storage
         persistentVolumeClaim:
           claimName: mysql-pv-claim
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: mysql-users-srv
-spec:
-  ports:
-  - port: 3306
-  selector:
-    app: mysql-users

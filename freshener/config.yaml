@@ -3,10 +3,8 @@ ignore_smells:
   - name: catalogue
     containers:
     - dynatrace
-  noapigateway: 
-  - name: catalogue
-    containers:
     - search-engine
+  noapigateway: 
   endpoint_based_interaction:
   - frontend
   - shipping
