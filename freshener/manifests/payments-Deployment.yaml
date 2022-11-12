@@ -4,7 +4,6 @@ metadata:
   name: payments
   labels:
     service: payments
-    stage: prod
 spec:
   hostNetwork: true
   replicas: 1
