@@ -1,4 +1,7 @@
+use std::collections::HashMap;
+
 use serde::{Serialize, Deserialize};
+use serde_json::Value;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[allow(non_snake_case)]
@@ -179,7 +182,7 @@ pub struct Spec {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hostNetwork: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub selector: Option<Selector>,
+    pub selector: Option<HashMap<String, Value>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hosts: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]

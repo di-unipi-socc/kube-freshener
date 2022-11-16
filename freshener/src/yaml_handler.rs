@@ -1,5 +1,6 @@
 use crate::{k8s_types::*, yaml_handler};
 use crate::{config_type::*};
+use std::collections::HashMap;
 use std::fs::File;
 use std::vec;
 use std::{fs, io::Write};
@@ -186,7 +187,7 @@ pub fn get_ignored_manifests() -> Vec<String> {
 }
 
 pub fn create_virtual_service(depl_name: String) {
-    let mut path = String::from("./manifests/Istio/");
+    let mut path = String::from("./manifests/");
     path.push_str(&depl_name);
     path.push_str("-virtual-service.yaml");
 
@@ -272,6 +273,10 @@ pub fn create_service_from(name: String) {
     let mut file = File::create(path)
         .expect("Error encountered while creating a new service!");
 
+    let mut selector = HashMap::new();
+
+    selector.insert(String::from("app"), serde_json::Value::String(name.clone()));
+
     let service_manifest = K8SManifest {
         api_version: "v1".to_string(),
         kind: "Service".to_string(),
@@ -282,11 +287,7 @@ pub fn create_service_from(name: String) {
             volumes: None,
             template: None,
             hostNetwork: None,
-            selector: Some(Selector {
-                service: None,
-                match_labels: None,
-                app: Some(name)
-            }),
+            selector: Some(selector),
             hosts: None,
             host: None,
             trafficPolicy: None,

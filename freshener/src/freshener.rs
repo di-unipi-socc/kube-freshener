@@ -1,4 +1,4 @@
-use std::{collections::HashMap, borrow::Borrow};
+use std::{collections::HashMap};
 
 use colored::Colorize;
 
@@ -93,21 +93,20 @@ pub fn check_endpoint_based_interaction(
     for service_manifest in &services_manifests {
         if let Some(selector) = &service_manifest.spec.selector {
 
-            let app_name = selector.app.clone();
-            let service_name = selector.service.clone();
-            let mut name = String::from("");
+            let mut name = "";
 
-            if !app_name.is_none() {
-                name = app_name.unwrap();
-            } else if !service_name.is_none() {
-                name = service_name.unwrap();
+            if let Some(first) = selector
+                .values()
+                .next() {
+                name = first
+                    .as_str()
+                    .unwrap();
             }
 
             if !name.is_empty() { 
                 // if exists a service with the selector.app = tosca service name
-                
                 if let Some(node) = microservices_hashmap
-                    .get(&*name) {
+                    .get(name) {
                     // set the bool as true so that we can identify tosca services that have
                     // an attached k8s service
                     let updated_microservice = Microservice {
@@ -280,8 +279,6 @@ pub fn check_no_apigateway(manifests: &Vec<K8SManifest>, is_to_refactor: bool) {
                         manifest_cpy.spec.template = Some(_template);
                         manifest_cpy.spec.containers = None;
                     }
-                    
-                    println!("UPDATING MANIFEST IN {} WITH:\n{:#?}", filename, manifest_cpy);
 
                     // println!("{} has been modified with\n{:#?}", filename, man);
                     yaml_handler::update_manifest(&manifest_cpy, filename); 
@@ -292,7 +289,6 @@ pub fn check_no_apigateway(manifests: &Vec<K8SManifest>, is_to_refactor: bool) {
 }
 
 pub fn check_independent_depl(manifests: &Vec<K8SManifest>, is_to_refactor: bool) {
-
     let deployment_manifests = yaml_handler::get_deployments_pods(manifests);
 
     for manifest in deployment_manifests {
