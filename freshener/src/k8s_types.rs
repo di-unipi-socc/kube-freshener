@@ -160,6 +160,22 @@ pub struct SecurityContext {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Destination {
+    pub host: String,
+    pub timeout: String
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RouteSpec {
+    pub destinations: Vec<Destination>
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HttpSpec {
+    pub route: Vec<RouteSpec>
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[allow(non_snake_case)]
 pub struct Spec {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -185,6 +201,8 @@ pub struct Spec {
     pub selector: Option<HashMap<String, Value>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hosts: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub http: Option<HttpSpec>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub host: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

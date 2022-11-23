@@ -1,23 +1,9 @@
 ignore_smells:
   multiple_container:
-  - name: catalogue
-    containers:
-    - dynatrace
-    - search-engine
   noapigateway: 
   endpoint_based_interaction:
-  - frontend
-  - shipping
   wobbly:
-  - frontend 
 invoked_services:
-- categories
-- mongodb
-- mysql
-- cart
-- rabbitmq
-- shipping
-- catalogue
-- user-manager
+- catalog
 ignored_manifests:
 - test.yaml

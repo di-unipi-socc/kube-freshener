@@ -207,6 +207,14 @@ pub fn create_virtual_service(depl_name: String) {
             selector: None,
             hosts: Some(vec![depl_name.clone()]),
             host: None,
+            http: Some(HttpSpec { route: 
+                vec![RouteSpec{
+                    destinations: vec![Destination {
+                        host: depl_name.clone(),
+                        timeout: String::from("0.4s")
+                    }]
+                }]
+            }),
             trafficPolicy: None,
             replicas: None,
             restartPolicy: None,
@@ -246,6 +254,7 @@ pub fn create_pod_from(container: &Container) {
             selector: None,
             hosts: None,
             host: None,
+            http: None,
             trafficPolicy: None,
             replicas: None,
             restartPolicy: None,
@@ -290,6 +299,7 @@ pub fn create_service_from(name: String) {
             selector: Some(selector),
             hosts: None,
             host: None,
+            http: None,
             trafficPolicy: None,
             replicas: None,
             restartPolicy: None,
