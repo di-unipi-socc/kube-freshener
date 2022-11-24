@@ -2,13 +2,14 @@ use std::collections::HashMap;
 
 use serde::{Serialize, Deserialize};
 use serde_json::Value;
+use serde_with::skip_serializing_none;
 
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[allow(non_snake_case)]
 pub struct Port {
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub hostPort: Option<i32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    
     #[serde(rename = "containerPort")]
     pub container_port: Option<i32>
 }
@@ -25,17 +26,17 @@ pub struct Limit {
     pub memory: String
 }
 
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Resources {
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub limits: Option<Limit>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub requests: Option<Limit>
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Env {
     pub name: String,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<String>
 }
@@ -52,27 +53,28 @@ pub struct Exec {
     pub exec: Option<Command>
 }
 
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Container {
     pub name: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    
     #[serde(rename = "securityContext")]
     pub security_context: Option<SecurityContext>,
+    
     pub image: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub ports: Option<Vec<Port>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    
     #[serde(rename = "readinessProbe")]
     pub readiness_probe: Option<Exec>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    
     #[serde(rename = "livenessProbe")]
     pub liveness_probe: Option<Exec>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    
     pub resources: Option<Resources>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    
     #[serde(rename = "imagePullPolicy")]
     pub image_pull_policy: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    
     pub env: Option<Vec<Env>>
 }
 
@@ -81,51 +83,48 @@ pub struct Volume {
     pub name: String,
 }
 
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[allow(non_snake_case)]
 pub struct TemplateSpec {
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub initContainers: Option<Vec<Container>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub containers: Option<Vec<Container>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub volumes: Option<Vec<Volume>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Template {
     pub spec: TemplateSpec,
+    
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<MetadataTemplate>
 }
 
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Labels {
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub app: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub service: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
 }
 
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Selector {
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub service: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    
     #[serde(rename = "matchLabels")]
     pub match_labels: Option<Labels>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    
     pub app: Option<String>
 }
 
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OutlierDetection {
-    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "consecutive5xxErrors")]
     pub consecutive_errors: Option<i32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    
     pub interval: Option<String>
 }
 
@@ -135,26 +134,26 @@ pub struct TrafficPolicy {
     pub outlier_detection: Option<OutlierDetection>
 }
 
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SecurityContext {
-    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "fsGroup")]
     pub fs_group: Option<i32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    
     #[serde(rename = "runAsGroup")]
     pub run_as_group: Option<i32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    
     #[serde(rename = "runAsNonRoot")]
     pub run_as_non_root: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    
     #[serde(rename = "runAsUser")]
     pub run_as_user: Option<i32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    
     #[serde(rename = "allowPrivilegeEscalation")]
     pub allow_privilege_escalation: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    
     pub priviliged: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    
     #[serde(rename = "readOnlyRootFilesystem")]
     pub read_only_root_filesystem: Option<bool>
 }
@@ -162,60 +161,61 @@ pub struct SecurityContext {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Destination {
     pub host: String,
-    pub timeout: String
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RouteSpec {
-    pub destinations: Vec<Destination>
+    pub destinations: Destination
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HttpSpec {
-    pub route: Vec<RouteSpec>
+    pub route: Vec<RouteSpec>,
+    pub timeout: String
 }
 
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[allow(non_snake_case)]
 pub struct Spec {
-    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "serviceAccountName")]
     pub service_account_name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+
     #[serde(rename = "terminationGracePeriodSeconds")]
     pub termination_grace_period_seconds: Option<i32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    
     #[serde(rename = "securityContext")]
     pub security_context: Option<SecurityContext>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    
     pub initContainers: Option<Vec<Container>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    
     pub containers: Option<Vec<Container>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    
     pub volumes: Option<Vec<Volume>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    
     pub template: Option<Template>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    
     pub hostNetwork: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    
     pub selector: Option<HashMap<String, Value>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    
     pub hosts: Option<Vec<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub http: Option<HttpSpec>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    
+    pub http: Option<Vec<HttpSpec>>,
+    
     pub host: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    
     pub trafficPolicy: Option<TrafficPolicy>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    
     pub replicas: Option<i32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    
     pub restartPolicy: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Metadata { 
     pub name: String,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub labels: Option<Labels>
 }

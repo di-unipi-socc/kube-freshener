@@ -207,14 +207,14 @@ pub fn create_virtual_service(depl_name: String) {
             selector: None,
             hosts: Some(vec![depl_name.clone()]),
             host: None,
-            http: Some(HttpSpec { route: 
+            http: Some(vec![HttpSpec { route: 
                 vec![RouteSpec{
-                    destinations: vec![Destination {
-                        host: depl_name.clone(),
-                        timeout: String::from("0.4s")
-                    }]
-                }]
-            }),
+                    destinations: Destination {
+                        host: depl_name.clone()
+                    }
+                }],
+                timeout: String::from("0.4s")
+            }]),
             trafficPolicy: None,
             replicas: None,
             restartPolicy: None,

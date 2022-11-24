@@ -142,22 +142,30 @@ pub fn check_endpoint_based_interaction(
                 );
 
                 if is_to_refactor {
-                    if let Some(mut invoked_service_manifest) = deployments_manifests.clone()
+                    if let Some(mut invoked_service_manifest) 
+                    = deployments_manifests
+                    .clone()
                     .into_iter()
-                    .find(|man| man.metadata.name == *invoked_service) {
+                    .find(|man| 
+                        man.metadata.name == *invoked_service
+                    ) {
                         // * Removing every host network or host port
 
                         invoked_service_manifest.spec.hostNetwork = None;
 
                         // pod case
-                        if let Some(containers) = &invoked_service_manifest.spec.containers {
+                        if let Some(containers) 
+                        = &invoked_service_manifest.spec.containers {
                             let mut pod_refactored_containers: Vec<Container> = containers.clone();
                             for container in containers { 
                                 let mut c = container.clone();
-                                let has_host_ports = !&container.ports.is_none() && container.ports.as_ref()
+                                let has_host_ports = !&container
+                                    .ports.is_none() && container.ports.as_ref()
                                     .unwrap()
                                     .into_iter()
-                                    .any(|port| !port.hostPort.is_none());
+                                    .any(|port|
+                                        !port.hostPort.is_none()
+                                    );
 
                                 if has_host_ports { c.ports = None }
                                 pod_refactored_containers.push(c);
@@ -280,7 +288,6 @@ pub fn check_no_apigateway(manifests: &Vec<K8SManifest>, is_to_refactor: bool) {
                         manifest_cpy.spec.containers = None;
                     }
 
-                    // println!("{} has been modified with\n{:#?}", filename, man);
                     yaml_handler::update_manifest(&manifest_cpy, filename); 
                 }
             }
@@ -295,18 +302,27 @@ pub fn check_independent_depl(manifests: &Vec<K8SManifest>, is_to_refactor: bool
 
         let mut manifest_cpy = manifest.clone();
         let filename = format!("{}{}", manifest.metadata.name, ".yaml");
-        let containers = &manifest.spec.containers;
+        
 
         // checking independent deployability
         if manifest.kind == "Pod" {
+            let containers = &manifest.spec.containers;
             if let Some(mut containers) = containers.clone() {
-                let refactored_containers = analyze_multiple_containers(&mut containers, manifest.metadata.name.clone(), is_to_refactor);
+                let refactored_containers = analyze_multiple_containers(
+                    &mut containers, 
+                    manifest.metadata.name.clone(),
+                     is_to_refactor
+                );
                 manifest_cpy.spec.containers = Some(refactored_containers);
              }
         } else if manifest.kind == "Deployment" {
             if let Some(template) = manifest.spec.template {
                 if let Some(mut nested_containers) = template.spec.containers {
-                    let refactored_containers = analyze_multiple_containers(&mut nested_containers, manifest.metadata.name.clone(), is_to_refactor);
+                    let refactored_containers = analyze_multiple_containers(
+                        &mut nested_containers,
+                         manifest.metadata.name.clone(),
+                          is_to_refactor
+                    );
                     
                     let _spec = TemplateSpec {
                         initContainers: template.spec.initContainers,
