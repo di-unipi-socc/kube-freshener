@@ -18,7 +18,41 @@ Once all the configuration has been provided, `KubeFreshener` can be run by exec
 cargo run analyze [-s] 
 ``` 
 which runs the analysis and returns an output like that below. If the option `-s` is set, `KubeFreshener` will also update the files in the `manifest` by providing the *refactoring templates* to be completed to resolve the occurrence of identified smells.
-![](data/figures/screen.png)
+``` 
+*** K8S FRESHENER ***
+
+####### Parsing ########
+[*] Parsing catalog-Deployment.yaml
+[*] Parsing apache-Service.yaml
+[*] Parsing customer-Deployment.yaml
+[*] Parsing catalog-Service.yaml
+[*] Parsing apache-Deployment.yaml
+[*] Parsing order-Service.yaml
+[*] Parsing order-Deployment.yaml
+[*] Parsing customer-Service.yaml
+[*] Parsing done
+
+### Start Inspection ###
+! [Wobbly Interaction]
+(*) Service named customer is reached by another service 
+without any circuit breaker or timeout. 
+
+Hint: solve it by adding circuit_breaker and/or and timeout in between .
+
+! [Wobbly Interaction]
+(*) Service named order is reached by another service 
+without any circuit breaker or timeout. 
+
+Hint: solve it by adding circuit_breaker and/or and timeout in between .
+
+! [Wobbly Interaction]
+(*) Service named catalog is reached by another service 
+without any circuit breaker or timeout. 
+
+Hint: solve it by adding circuit_breaker and/or and timeout in between .
+
+### Inspection Ended ###
+``` 
 
 ## Examples
 The necessary inputs (config and manifest files) for running examples of analyses are available in the [data/examples](data/examples) folder, together with the generated refactoring templates. 
