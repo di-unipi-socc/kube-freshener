@@ -23,7 +23,7 @@ fn main() {
 
     match command {
         CMD::Analyze => {
-            let mut manifests: Vec<K8SManifest> = Vec::new();
+            let mut manifests: Vec<K8SManifest>;
                 
             println!("{}\n", format!("*** K8S FRESHENER ***").blue().bold());
 
