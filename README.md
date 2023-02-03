@@ -14,9 +14,11 @@ The methodology implemented by `KubeFreshener` has been first presented in the p
 2. `ignore_smells` - list of architectural smells that should not be checked on given microservices.
 
 Once all the configuration has been provided, `KubeFreshener` can be run by executing the command 
-```cargo run analyze [-s]``` 
+``` 
+cargo run analyze [-s] 
+``` 
 which runs the analysis and returns an output like that below. If the option `-s` is set, `KubeFreshener` will also update the files in the `manifest` by providing the *refactoring templates* to be completed to resolve the occurrence of identified smells.
 ![](data/figures/screen.png)
 
-## Examples
+## Examples
 The necessary inputs (config and manifest files) for running examples of analyses are available in the [data/examples](data/examples) folder, together with the generated refactoring templates. 
