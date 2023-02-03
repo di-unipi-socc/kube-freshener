@@ -3,7 +3,5 @@ ignore_smells:
   noapigateway: 
   endpoint_based_interaction:
   wobbly:
-invoked_services:
-- catalog
-ignored_manifests:
-- test.yaml
+invoked_services: [ ]
+ignored_manifests: [ ]
