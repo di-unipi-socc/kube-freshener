@@ -1,0 +1,7 @@
+ignore_smells:
+  multiple_container:
+  noapigateway: 
+  endpoint_based_interaction:
+  wobbly:
+invoked_services: [ customer, order, catalog ]
+ignored_manifests: [ ]
