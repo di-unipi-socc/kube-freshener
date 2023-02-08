@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalogue
+spec:
+  template:
+    spec:
+      containers:
+      - name: catalogue
+        image: robotshop/rs-catalogue:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: INSTANA_AGENT_HOST
+      - name: dynatrace
+        image: dynatrace/oneagent
+  selector:
+    service: null
+  replicas: 1

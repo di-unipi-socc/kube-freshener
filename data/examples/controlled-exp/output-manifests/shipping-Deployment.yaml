@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shipping
+  labels:
+    service: shipping
+spec:
+  template:
+    spec:
+      containers:
+      - name: shipping
+        image: robotshop/rs-shipping:latest
+        readinessProbe: {}
+        resources:
+          limits:
+            cpu: 200m
+            memory: 1000Mi
+          requests:
+            cpu: 100m
+            memory: 500Mi
+        imagePullPolicy: IfNotPresent
+    metadata:
+      labels:
+        service: shipping
+  selector:
+    matchLabels:
+      service: shipping
+  replicas: 1

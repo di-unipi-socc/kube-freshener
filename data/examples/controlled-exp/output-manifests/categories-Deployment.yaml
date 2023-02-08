@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: categories
+  labels:
+    service: categories
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      service: categories
+  template:
+    metadata:
+      labels:
+        service: categories
+    spec:
+      serviceAccountName: robot-shop
+      containers:
+      - name: categories
+        image: robotshop/rs-categories:latest
+        imagePullPolicy: IfNotPresent
+        env:
+          - name: INSTANA_AGENT_HOST
+            valueFrom:
+              fieldRef:
+                fieldPath: status.hostIP
+        ports:
+        - containerPort: 8080
+        resources:
+          limits:
+            cpu: 200m
+            memory: 100Mi
+          requests:
+            cpu: 100m
+            memory: 50Mi
+      restartPolicy: Always

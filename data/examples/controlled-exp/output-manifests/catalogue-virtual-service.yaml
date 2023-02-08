@@ -5,3 +5,8 @@ metadata:
 spec:
   hosts:
   - catalogue
+  http:
+  - route:
+    - destinations:
+        host: catalogue
+    timeout: 0.4s

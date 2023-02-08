@@ -1,0 +1,12 @@
+
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: user-manager
+spec:
+  host: user-manager
+  trafficPolicy:
+    outlierDetection:
+      consecutive5xxErrors: 10
+      interval: 2m
+      baseEjectionTime: 10m

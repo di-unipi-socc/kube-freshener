@@ -1,0 +1,15 @@
+apiVersion: apps/v1
+kind: Pod
+metadata:
+  name: search-engine
+spec:
+  containers:
+  - name: search-engine
+    image: mamarino/search-engine:latest
+    resources:
+      limits:
+        cpu: 200m
+        memory: 100Mi
+      requests:
+        cpu: 100m
+        memory: 50Mi
